@@ -18,10 +18,8 @@ function onOpen() {
       .addItem('DB_Transactions再構築', 'resetTransactionsSheet'))
     .addSeparator()
     .addSubMenu(ui.createMenu('📊 表示切替')
-      .addItem('Month_Viewを開く', 'openMonthView')
       .addItem('DB_Transactionsを開く', 'openTransactions')
-      .addItem('DB_Budgetを開く', 'openBudget')
-      .addItem('Settingsを開く', 'openSettings'))
+      .addItem('DB_Budgetを開く', 'openBudget'))
     .addSeparator()
     .addItem('📋 全シート状態確認', 'checkAllSheets')
     .addToUi();
@@ -69,17 +67,14 @@ function initializeDatabase() {
     setupDB_Transactions();  // 資金台帳（旧DB_Integrated）
     setupDB_Master();        // キーワードルール
     setupDB_Budget();        // 予算管理（UPSIDER・現金）
-    setupInput_CashPlan();   // 予定取引（新規）
-    setupCalendar();         // 日付スパイン（新規）
-    setupSettings();         // 設定（対象月・期首残高）
-    setupMonth_View();       // 月次資金予実表（メイン画面）
+    setupInput_CashPlan();   // 予定取引
 
     showToast('✅ 初期化完了！', 'Cash Flow管理システムが稼働しました', 5);
 
     return {
       success: true,
       message: '初期化完了',
-      sheets: ['Source_1-6', 'DB_Transactions', 'DB_Master', 'DB_Budget', 'Input_CashPlan', 'Calendar', 'Settings', 'Month_View']
+      sheets: ['Source_1-6', 'DB_Transactions', 'DB_Master', 'DB_Budget', 'Input_CashPlan']
     };
   } catch (error) {
     showToast('❌ エラー', error.message, 10);
@@ -626,7 +621,7 @@ function setupInput_CashPlan() {
   }
 
   // ヘッダー
-  const headers = ['予定日', '口座', '科目', 'タグ', '予定金額', '繰り返し', 'ステータス', 'メモ'];
+  const headers = ['予定日', '口座', '科目', '予定金額', '繰り返し', 'ステータス', 'メモ'];
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
 
   const headerRange = sheet.getRange(1, 1, 1, headers.length);
@@ -637,23 +632,22 @@ function setupInput_CashPlan() {
 
   // サンプルデータ
   const sampleData = [
-    [new Date(2025, 0, 25), 'みずほ銀行', '家賃', '事務所家賃', -200000, '毎月25日', '予定', ''],
-    [new Date(2025, 0, 31), 'みずほ銀行', '人件費', '給与', -300000, '毎月末日', '予定', ''],
-    [new Date(2025, 1, 10), 'UPSIDER', '広告宣伝費', 'Google広告', -150000, '', '予定', '代表枠'],
-    [new Date(2025, 1, 15), 'みずほ銀行', '売上', 'クライアントA', 500000, '', '予定', '']
+    [new Date(2025, 0, 25), 'みずほ銀行', '家賃', -200000, '毎月25日', '予定', ''],
+    [new Date(2025, 0, 31), 'みずほ銀行', '人件費', -300000, '毎月末日', '予定', ''],
+    [new Date(2025, 1, 10), 'UPSIDER', '広告宣伝費', -150000, '', '予定', '代表枠'],
+    [new Date(2025, 1, 15), 'みずほ銀行', '売上', 500000, '', '予定', '']
   ];
 
-  sheet.getRange(2, 1, sampleData.length, 8).setValues(sampleData);
+  sheet.getRange(2, 1, sampleData.length, 7).setValues(sampleData);
 
   // 列幅調整
   sheet.setColumnWidth(1, 100);  // 予定日
   sheet.setColumnWidth(2, 150);  // 口座
   sheet.setColumnWidth(3, 150);  // 科目
-  sheet.setColumnWidth(4, 150);  // タグ
-  sheet.setColumnWidth(5, 120);  // 予定金額
-  sheet.setColumnWidth(6, 100);  // 繰り返し
-  sheet.setColumnWidth(7, 80);   // ステータス
-  sheet.setColumnWidth(8, 200);  // メモ
+  sheet.setColumnWidth(4, 120);  // 予定金額
+  sheet.setColumnWidth(5, 100);  // 繰り返し
+  sheet.setColumnWidth(6, 80);   // ステータス
+  sheet.setColumnWidth(7, 200);  // メモ
 
   // 説明欄
   sheet.getRange('J1').setValue('📅 予定取引（Input_CashPlan）');
@@ -672,294 +666,6 @@ function setupInput_CashPlan() {
   Logger.log('Input_CashPlan 作成完了');
 }
 
-/**
- * Calendar シート（日付スパイン）
- * v5.0: 日付の連番を自動生成
- */
-function setupCalendar() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName('Calendar');
-
-  if (!sheet) {
-    sheet = ss.insertSheet('Calendar');
-  }
-
-  if (sheet.getRange('A1').getValue() !== '') {
-    Logger.log('Calendar は既に設定済み');
-    return;
-  }
-
-  // ヘッダー
-  sheet.getRange('A1').setValue('日付');
-  sheet.getRange('A1').setBackground('#674ea7').setFontColor('#FFFFFF').setFontWeight('bold');
-
-  // 開始日と終了日を設定（過去1年〜未来1年）
-  sheet.getRange('C1').setValue('開始日:');
-  sheet.getRange('D1').setValue(new Date(2024, 0, 1));
-  sheet.getRange('C2').setValue('終了日:');
-  sheet.getRange('D2').setValue(new Date(2025, 11, 31));
-
-  // SEQUENCEで日付を自動生成（A2セル）
-  const sequenceFormula = `=SEQUENCE(D2-D1+1, 1, D1, 1)`;
-  sheet.getRange('A2').setFormula(sequenceFormula);
-
-  // 日付フォーマット
-  sheet.getRange('A2:A').setNumberFormat('yyyy-mm-dd');
-
-  sheet.setColumnWidth(1, 120);
-
-  // 説明欄
-  sheet.getRange('F1').setValue('📆 日付スパイン（Calendar）');
-  sheet.getRange('F1').setFontSize(14).setFontWeight('bold').setFontColor('#674ea7');
-  sheet.getRange('F2').setValue('');
-  sheet.getRange('F3').setValue('【原則】');
-  sheet.getRange('F4').setValue('✅ 日付に欠番なし（連続保証）');
-  sheet.getRange('F5').setValue('✅ Daily_Cashで残高を連続表示');
-
-  sheet.setColumnWidth(6, 280);
-
-  Logger.log('Calendar 作成完了');
-}
-
-/**
- * Daily_Cash シート（残高連続表示）
- * v5.0: 日次残高の連続表示
- */
-function setupDaily_Cash() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName('Daily_Cash');
-
-  if (!sheet) {
-    sheet = ss.insertSheet('Daily_Cash');
-  }
-
-  if (sheet.getRange('A1').getValue() !== '') {
-    Logger.log('Daily_Cash は既に設定済み');
-    return;
-  }
-
-  // ヘッダー
-  const headers = ['日付', '期首残高', '当日実績', '当日予定', '期末残高', '予定差異', '累計実績', '累計予定'];
-  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-
-  const headerRange = sheet.getRange(1, 1, 1, headers.length);
-  headerRange.setBackground('#0b5394');
-  headerRange.setFontColor('#FFFFFF');
-  headerRange.setFontWeight('bold');
-  headerRange.setHorizontalAlignment('center');
-
-  // A2: Calendarから日付を取得
-  sheet.getRange('A2').setFormula('=Calendar!A2:A');
-
-  // 説明欄
-  sheet.getRange('J1').setValue('💵 日次残高（Daily_Cash）');
-  sheet.getRange('J1').setFontSize(14).setFontWeight('bold').setFontColor('#0b5394');
-  sheet.getRange('J2').setValue('');
-  sheet.getRange('J3').setValue('【原則】');
-  sheet.getRange('J4').setValue('✅ 日付は Calendar から自動取得');
-  sheet.getRange('J5').setValue('✅ 実績は DB_Transactions から集計');
-  sheet.getRange('J6').setValue('✅ 予定は Input_CashPlan から集計');
-  sheet.getRange('J7').setValue('');
-  sheet.getRange('J8').setValue('【Phase 2で実装予定】');
-  sheet.getRange('J9').setValue('- SUMIF による日別集計');
-  sheet.getRange('J10').setValue('- 残高の累積計算');
-
-  sheet.setColumnWidth(10, 280);
-
-  Logger.log('Daily_Cash 作成完了');
-}
-
-/**
- * Settings シート（対象月・期首残高）
- * v5.0: 月次表示の基準設定
- */
-function setupSettings() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName('Settings');
-
-  if (!sheet) {
-    sheet = ss.insertSheet('Settings');
-  }
-
-  if (sheet.getRange('A1').getValue() !== '') {
-    Logger.log('Settings は既に設定済み');
-    return;
-  }
-
-  // ヘッダー
-  sheet.getRange('A1').setValue('⚙️ 設定');
-  sheet.getRange('A1').setFontSize(16).setFontWeight('bold').setFontColor('#0b5394');
-
-  // 対象月
-  sheet.getRange('A3').setValue('対象月:');
-  sheet.getRange('B3').setValue(new Date()); // 今月
-  sheet.getRange('B3').setNumberFormat('yyyy-mm');
-
-  // 期首残高
-  sheet.getRange('A5').setValue('期首残高（全口座合算）:');
-  sheet.getRange('B5').setValue(0);
-  sheet.getRange('B5').setNumberFormat('#,##0');
-
-  // 口座別期首残高（任意）
-  sheet.getRange('A7').setValue('【口座別期首残高】');
-  const accountHeaders = ['口座名', '期首残高'];
-  sheet.getRange('A8:B8').setValues([accountHeaders]);
-  sheet.getRange('A8:B8').setBackground('#0b5394').setFontColor('#FFFFFF').setFontWeight('bold');
-
-  const sampleAccounts = [
-    ['みずほ銀行', 1000000],
-    ['SBI銀行', 500000],
-    ['楽天銀行', 300000],
-    ['UPSIDER', 200000]
-  ];
-  sheet.getRange(9, 1, sampleAccounts.length, 2).setValues(sampleAccounts);
-
-  // 列幅調整
-  sheet.setColumnWidth(1, 200);
-  sheet.setColumnWidth(2, 150);
-
-  // 説明欄
-  sheet.getRange('D1').setValue('⚙️ 設定シート');
-  sheet.getRange('D1').setFontSize(14).setFontWeight('bold').setFontColor('#0b5394');
-  sheet.getRange('D2').setValue('');
-  sheet.getRange('D3').setValue('【使い方】');
-  sheet.getRange('D4').setValue('1. 対象月を変更すると Month_View が自動更新');
-  sheet.getRange('D5').setValue('2. 期首残高は月初の実残高を入力');
-  sheet.getRange('D6').setValue('3. 口座別は任意（合算でもOK）');
-
-  sheet.setColumnWidth(4, 280);
-
-  Logger.log('Settings 作成完了');
-}
-
-/**
- * Month_View シート（月次資金予実表）
- * v5.0: 日次で実績と予定を表示
- */
-function setupMonth_View() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName('Month_View');
-
-  if (!sheet) {
-    sheet = ss.insertSheet('Month_View');
-  }
-
-  sheet.clear();
-
-  // ヘッダー
-  const headers = [
-    '日付',
-    '期首残高',
-    '実績入金',
-    '実績出金',
-    '実績純増減',
-    '予定入金',
-    '予定出金',
-    '予定純増減',
-    '差異',
-    '期末残高',
-    '予測残高',
-    'メモ'
-  ];
-  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-
-  // ヘッダースタイル
-  const headerRange = sheet.getRange(1, 1, 1, headers.length);
-  headerRange.setBackground('#0b5394');
-  headerRange.setFontColor('#FFFFFF');
-  headerRange.setFontWeight('bold');
-  headerRange.setHorizontalAlignment('center');
-  headerRange.setFontSize(11);
-
-  // 数式エリア（A2から開始）
-  // A2: 対象月の日付連番を取得（後でARRAYFORMULAで実装）
-  sheet.getRange('A2').setFormula('=FILTER(Calendar!A:A, (MONTH(Calendar!A:A)=MONTH(Settings!B3))*(YEAR(Calendar!A:A)=YEAR(Settings!B3)))');
-
-  // B2: 期首残高（1日目はSettings、2日目以降は前日の期末残高）
-  sheet.getRange('B2').setFormula('=IF(ROW()=2, Settings!B5, J1)');
-
-  // C2: 実績入金（その日の入金合計）
-  sheet.getRange('C2').setFormula('=SUMIFS(DB_Transactions!D:D, DB_Transactions!A:A, A2, DB_Transactions!D:D, ">0", DB_Transactions!F:F, "<>振替")');
-
-  // D2: 実績出金（その日の出金合計）
-  sheet.getRange('D2').setFormula('=SUMIFS(DB_Transactions!D:D, DB_Transactions!A:A, A2, DB_Transactions!D:D, "<0", DB_Transactions!F:F, "<>振替")');
-
-  // E2: 実績純増減
-  sheet.getRange('E2').setFormula('=C2+D2');
-
-  // F2: 予定入金
-  sheet.getRange('F2').setFormula('=SUMIFS(Input_CashPlan!E:E, Input_CashPlan!A:A, A2, Input_CashPlan!E:E, ">0")');
-
-  // G2: 予定出金
-  sheet.getRange('G2').setFormula('=SUMIFS(Input_CashPlan!E:E, Input_CashPlan!A:A, A2, Input_CashPlan!E:E, "<0")');
-
-  // H2: 予定純増減
-  sheet.getRange('H2').setFormula('=F2+G2');
-
-  // I2: 差異（実績がある場合のみ）
-  sheet.getRange('I2').setFormula('=IF(OR(C2<>0, D2<>0), E2-H2, "")');
-
-  // J2: 期末残高（実績ベース）
-  sheet.getRange('J2').setFormula('=B2+E2');
-
-  // K2: 予測残高（実績優先、なければ予定）
-  sheet.getRange('K2').setFormula('=IF(OR(C2<>0, D2<>0), J2, B2+H2)');
-
-  // 数式を下にコピー（最大31日分）
-  const formulaRange = sheet.getRange('B2:K2');
-  formulaRange.copyTo(sheet.getRange('B3:K32'), SpreadsheetApp.CopyPasteType.PASTE_FORMULA);
-
-  // 列幅調整
-  sheet.setColumnWidth(1, 100);  // 日付
-  sheet.setColumnWidth(2, 120);  // 期首残高
-  sheet.setColumnWidth(3, 100);  // 実績入金
-  sheet.setColumnWidth(4, 100);  // 実績出金
-  sheet.setColumnWidth(5, 100);  // 実績純増減
-  sheet.setColumnWidth(6, 100);  // 予定入金
-  sheet.setColumnWidth(7, 100);  // 予定出金
-  sheet.setColumnWidth(8, 100);  // 予定純増減
-  sheet.setColumnWidth(9, 100);  // 差異
-  sheet.setColumnWidth(10, 120); // 期末残高
-  sheet.setColumnWidth(11, 120); // 予測残高
-  sheet.setColumnWidth(12, 200); // メモ
-
-  // 数値フォーマット
-  sheet.getRange('B:K').setNumberFormat('#,##0');
-  sheet.getRange('A:A').setNumberFormat('yyyy-mm-dd');
-
-  // 条件付き書式（残高が0未満で赤）
-  const balanceRange = sheet.getRange('J2:K32');
-  const rule = SpreadsheetApp.newConditionalFormatRule()
-    .whenNumberLessThan(0)
-    .setBackground('#f4c7c3')
-    .setFontColor('#cc0000')
-    .setRanges([balanceRange])
-    .build();
-  const rules = sheet.getConditionalFormatRules();
-  rules.push(rule);
-  sheet.setConditionalFormatRules(rules);
-
-  // 説明欄
-  sheet.getRange('N1').setValue('💰 月次資金予実表（Month_View）');
-  sheet.getRange('N1').setFontSize(14).setFontWeight('bold').setFontColor('#0b5394');
-  sheet.getRange('N2').setValue('');
-  sheet.getRange('N3').setValue('【原則】');
-  sheet.getRange('N4').setValue('✅ 日付は連番（欠番なし）');
-  sheet.getRange('N5').setValue('✅ 実績が来たら予定を置き換え');
-  sheet.getRange('N6').setValue('✅ 残高が日々繋がる');
-  sheet.getRange('N7').setValue('');
-  sheet.getRange('N8').setValue('【使い方】');
-  sheet.getRange('N9').setValue('1. Settings で対象月を変更');
-  sheet.getRange('N10').setValue('2. Source 貼付→統合更新');
-  sheet.getRange('N11').setValue('3. 自動で実績が反映される');
-  sheet.getRange('N12').setValue('');
-  sheet.getRange('N13').setValue('【赤字】');
-  sheet.getRange('N14').setValue('残高が0未満 = ショート警告');
-
-  sheet.setColumnWidth(14, 280);
-
-  Logger.log('Month_View 作成完了');
-}
 
 /**
  * 振替検出ロジック
@@ -1036,7 +742,7 @@ function detectTransfers() {
  */
 function checkAllSheets() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const requiredSheets = ['Source_1', 'Source_2', 'Source_3', 'Source_4', 'Source_5', 'Source_6', 'DB_Transactions', 'DB_Master', 'DB_Budget', 'Input_CashPlan', 'Calendar', 'Settings', 'Month_View'];
+  const requiredSheets = ['Source_1', 'Source_2', 'Source_3', 'Source_4', 'Source_5', 'Source_6', 'DB_Transactions', 'DB_Master', 'DB_Budget', 'Input_CashPlan'];
   const existingSheets = ss.getSheets().map(sheet => sheet.getName());
 
   let existCount = 0;
@@ -1064,13 +770,6 @@ function checkAllSheets() {
 }
 
 /**
- * Month_Viewシートを開く
- */
-function openMonthView() {
-  switchToSheet('Month_View');
-}
-
-/**
  * DB_Transactionsシートを開く
  */
 function openTransactions() {
@@ -1082,13 +781,6 @@ function openTransactions() {
  */
 function openBudget() {
   switchToSheet('DB_Budget');
-}
-
-/**
- * Settingsシートを開く
- */
-function openSettings() {
-  switchToSheet('Settings');
 }
 
 /**
