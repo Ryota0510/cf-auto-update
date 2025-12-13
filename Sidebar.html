@@ -299,71 +299,15 @@
 
   <!-- タブナビゲーション -->
   <div class="tab-nav">
-    <button class="tab-btn active" onclick="switchTab('uncategorized')">未分類</button>
-    <button class="tab-btn" onclick="switchTab('plan')">Plan登録</button>
+    <button class="tab-btn active" onclick="switchTab('plan')">Plan登録</button>
     <button class="tab-btn" onclick="switchTab('review')">月次レビュー</button>
   </div>
 
   <div class="container">
     <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
-    <!-- タブ1: 未分類バスター -->
+    <!-- タブ1: Plan登録 -->
     <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
-    <div id="tab-uncategorized" class="tab-content active">
-      <div class="section">
-        <div class="section-title">🔍 未分類取引</div>
-        <button class="btn btn-primary" onclick="loadUncategorized()">未分類を読み込み</button>
-        <div id="uncategorized-count" class="badge" style="display: none; margin-top: 10px;">0件</div>
-        <div id="uncategorized-list" class="uncategorized-list"></div>
-      </div>
-
-      <div class="section">
-        <div class="section-title">📝 キーワードルール登録</div>
-        <div class="form-group">
-          <label>選択した取引の摘要</label>
-          <textarea id="selected-description" readonly placeholder="上の未分類取引をクリックしてください"></textarea>
-        </div>
-
-        <div class="form-group">
-          <label>キーワード（正規表現可）</label>
-          <input type="text" id="keyword-input" placeholder="例: AMAZON|アマゾン">
-          <div class="help-text">部分一致で検索されます</div>
-        </div>
-
-        <button class="btn btn-secondary" onclick="previewKeyword()">プレビュー</button>
-        <div id="keyword-preview"></div>
-
-        <div class="form-group">
-          <label>科目</label>
-          <select id="keyword-category">
-            <option value="売上">売上</option>
-            <option value="広告宣伝費">広告宣伝費</option>
-            <option value="外注費">外注費</option>
-            <option value="消耗品費">消耗品費</option>
-            <option value="通信費">通信費</option>
-            <option value="支払手数料">支払手数料</option>
-            <option value="雑費">雑費</option>
-            <option value="役員報酬">役員報酬</option>
-            <option value="役員借入金">役員借入金</option>
-            <option value="立替金">立替金</option>
-            <option value="家賃">家賃</option>
-            <option value="人件費">人件費</option>
-            <option value="その他収入">その他収入</option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label>タグ（任意）</label>
-          <input type="text" id="keyword-tag" placeholder="例: Google広告">
-        </div>
-
-        <button class="btn btn-primary" onclick="registerKeyword()">ルールを登録</button>
-      </div>
-    </div>
-
-    <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
-    <!-- タブ2: Plan登録 -->
-    <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
-    <div id="tab-plan" class="tab-content">
+    <div id="tab-plan" class="tab-content active">
       <div class="section">
         <div class="section-title">📅 テンプレート選択</div>
         <div class="template-list">
@@ -468,155 +412,7 @@
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // タブ1: 未分類バスター
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    let allCategories = [];
-
-    // ページ読み込み時に科目一覧を取得
-    function loadCategories() {
-      google.script.run
-        .withSuccessHandler(function(result) {
-          if (result.success) {
-            allCategories = result.categories;
-          }
-        })
-        .getAllCategories();
-    }
-
-    function loadUncategorized() {
-      google.script.run
-        .withSuccessHandler(function(result) {
-          if (!result.success) {
-            alert('エラー: ' + result.message);
-            return;
-          }
-
-          const countBadge = document.getElementById('uncategorized-count');
-          const listDiv = document.getElementById('uncategorized-list');
-
-          if (result.count === 0) {
-            listDiv.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">未分類取引はありません</p>';
-            countBadge.style.display = 'none';
-            return;
-          }
-
-          countBadge.textContent = result.count + '件';
-          countBadge.style.display = 'inline-block';
-
-          // 科目ドロップダウンのオプション生成
-          const categoryOptions = allCategories.map(cat =>
-            `<option value="${escapeHtml(cat)}">${escapeHtml(cat)}</option>`
-          ).join('');
-
-          let html = '';
-          result.data.forEach((item, index) => {
-            const amountColor = item.amount >= 0 ? '#2e7d32' : '#e67e22';
-            const formattedDate = formatDate(item.date);
-
-            html += `
-              <div class="transaction-item" id="item-${index}">
-                <div class="transaction-date">${formattedDate} | ${escapeHtml(item.account)}</div>
-                <div class="transaction-desc">${escapeHtml(item.description)}</div>
-                <div class="transaction-amount" style="color: ${amountColor};">¥${item.amount.toLocaleString()}</div>
-                <div class="inline-register">
-                  <select id="category-${index}">
-                    <option value="">科目を選択</option>
-                    ${categoryOptions}
-                  </select>
-                  <input type="text" id="tag-${index}" placeholder="タグ（任意）">
-                  <button onclick="registerInline(${index}, '${escapeHtml(item.description)}')">登録</button>
-                </div>
-              </div>
-            `;
-          });
-
-          listDiv.innerHTML = html;
-        })
-        .getUncategorizedTransactions();
-    }
-
-    function registerInline(index, description) {
-      const category = document.getElementById('category-' + index).value;
-      const tag = document.getElementById('tag-' + index).value;
-
-      if (!category) {
-        alert('科目を選択してください');
-        return;
-      }
-
-      // キーワードとして摘要をそのまま使用
-      const keyword = description;
-
-      google.script.run
-        .withSuccessHandler(function(result) {
-          if (result.success) {
-            alert('✅ ルールを登録しました！');
-            // 登録した項目をリストから削除（視覚的フィードバック）
-            const item = document.getElementById('item-' + index);
-            if (item) {
-              item.style.opacity = '0.3';
-              item.style.pointerEvents = 'none';
-            }
-            // 少し待ってから再読み込み
-            setTimeout(() => {
-              loadUncategorized();
-            }, 500);
-          } else {
-            alert('エラー: ' + result.message);
-          }
-        })
-        .registerKeywordRule(keyword, category, tag);
-    }
-
-    function previewKeyword() {
-      const keyword = document.getElementById('keyword-input').value;
-      if (!keyword) {
-        alert('キーワードを入力してください');
-        return;
-      }
-
-      google.script.run
-        .withSuccessHandler(function(result) {
-          const previewDiv = document.getElementById('keyword-preview');
-          previewDiv.innerHTML = `
-            <div class="preview-box">
-              <div class="preview-count">${result.count}件</div>
-              <div style="font-size: 12px; color: #666; margin-top: 5px;">該当する取引</div>
-            </div>
-          `;
-        })
-        .previewKeywordMatch(keyword);
-    }
-
-    function registerKeyword() {
-      const keyword = document.getElementById('keyword-input').value;
-      const category = document.getElementById('keyword-category').value;
-      const tag = document.getElementById('keyword-tag').value;
-
-      if (!keyword || !category) {
-        alert('キーワードと科目を入力してください');
-        return;
-      }
-
-      google.script.run
-        .withSuccessHandler(function(result) {
-          if (result.success) {
-            alert('✅ ルールを登録しました！');
-            // フォームをクリア
-            document.getElementById('keyword-input').value = '';
-            document.getElementById('keyword-tag').value = '';
-            document.getElementById('keyword-preview').innerHTML = '';
-            // 未分類を再読み込み
-            loadUncategorized();
-          } else {
-            alert('エラー: ' + result.message);
-          }
-        })
-        .registerKeywordRule(keyword, category, tag);
-    }
-
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // タブ2: Plan登録
+    // タブ1: Plan登録
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     function loadTemplate(type) {
       const templates = {
@@ -727,14 +523,11 @@
       return `${year}-${month}-${day}`;
     }
 
-    // ページ読み込み時に今月をセットと科目一覧を取得
+    // ページ読み込み時に今月をセット
     document.addEventListener('DOMContentLoaded', function() {
       const today = new Date();
       const month = String(today.getMonth() + 1).padStart(2, '0');
       document.getElementById('review-month').value = `${today.getFullYear()}-${month}`;
-
-      // 科目一覧を取得
-      loadCategories();
     });
   </script>
 </body>

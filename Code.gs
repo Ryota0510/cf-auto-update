@@ -169,13 +169,13 @@ function setupDB_Transactions() {
   sheet.clear();
 
   // ═══════════════════════════════════════════════════
-  // Step 1: ヘッダー設定（A1:H1）
+  // Step 1: ヘッダー設定（A1:G1）
   // ═══════════════════════════════════════════════════
-  const headers = ['日付', '口座', '摘要', '金額', '科目', 'タグ', 'UID', '転記元'];
-  sheet.getRange('A1:H1').setValues([headers]);
+  const headers = ['日付', '口座', '摘要', '金額', '科目', 'UID', '転記元'];
+  sheet.getRange('A1:G1').setValues([headers]);
 
   // ヘッダースタイル
-  const headerRange = sheet.getRange('A1:H1');
+  const headerRange = sheet.getRange('A1:G1');
   headerRange.setBackground('#0b5394');
   headerRange.setFontColor('#FFFFFF');
   headerRange.setFontWeight('bold');
@@ -183,7 +183,7 @@ function setupDB_Transactions() {
   headerRange.setFontSize(11);
 
   // ═══════════════════════════════════════════════════
-  // Step 2: ARRAYFORMULA列の構築（A2-H列）
+  // Step 2: ARRAYFORMULA列の構築（A2-G列）
   // ═══════════════════════════════════════════════════
 
   // Source_1-6から統合データを取得するための内部シート参照用
@@ -196,6 +196,7 @@ function setupDB_Transactions() {
 
   // A2: 日付(整形) - K列（日付）から
   sheet.getRange('A2').setFormula('=ARRAYFORMULA(IF(K2:K="", "", DATEVALUE(LEFT(K2:K, 10))))');
+  sheet.getRange('A2:A').setNumberFormat('yyyy/mm/dd');
 
   // B2: 口座 - O列（連携サービス）から
   sheet.getRange('B2').setFormula('=ARRAYFORMULA(IF(O2:O="", "", O2:O))');
@@ -206,17 +207,14 @@ function setupDB_Transactions() {
   // D2: 金額(+/-) - M列（金額）を数値化（入金+/出金-）
   sheet.getRange('D2').setFormula('=ARRAYFORMULA(IF(M2:M="", "", VALUE(REGEXREPLACE(TO_TEXT(M2:M), "[^0-9-]", ""))))');
 
-  // E2: 科目 - DB_Masterからキーワードマッチング
-  sheet.getRange('E2').setFormula('=ARRAYFORMULA(IF(C2:C="", "", IFERROR(INDEX(DB_Master!B:B, MATCH(TRUE, ISNUMBER(SEARCH(DB_Master!A:A, C2:C)), 0)), "未分類")))');
+  // E2: カスタム関数で自動分類（科目のみ）
+  sheet.getRange('E2').setFormula('=AUTO_CATEGORIZE(C2:C)');
 
-  // F2: タグ - DB_Masterから詳細タグ
-  sheet.getRange('F2').setFormula('=ARRAYFORMULA(IF(C2:C="", "", IFERROR(INDEX(DB_Master!C:C, MATCH(TRUE, ISNUMBER(SEARCH(DB_Master!A:A, C2:C)), 0)), "")))');
+  // F2: UID - 口座+取引Noで一意キー生成
+  sheet.getRange('F2').setFormula('=ARRAYFORMULA(IF(B2:B="", "", B2:B & "-" & Q2:Q))');
 
-  // G2: UID - 口座+取引Noで一意キー生成
-  sheet.getRange('G2').setFormula('=ARRAYFORMULA(IF(B2:B="", "", B2:B & "-" & Q2:Q))');
-
-  // H2: 転記元 - 固定値「MF連携」
-  sheet.getRange('H2').setFormula('=ARRAYFORMULA(IF(K2:K="", "", "MF連携"))');
+  // G2: 転記元 - 固定値「MF連携」
+  sheet.getRange('G2').setFormula('=ARRAYFORMULA(IF(K2:K="", "", "MF連携"))');
 
   // ═══════════════════════════════════════════════════
   // Step 3: 列幅調整
@@ -226,37 +224,75 @@ function setupDB_Transactions() {
   sheet.setColumnWidth(3, 250);  // 摘要
   sheet.setColumnWidth(4, 120);  // 金額
   sheet.setColumnWidth(5, 150);  // 科目
-  sheet.setColumnWidth(6, 150);  // タグ
-  sheet.setColumnWidth(7, 200);  // UID
-  sheet.setColumnWidth(8, 100);  // 転記元
+  sheet.setColumnWidth(6, 200);  // UID
+  sheet.setColumnWidth(7, 100);  // 転記元
 
   // J列以降は非表示（内部データ）
   sheet.hideColumns(10, 10);
 
   // ═══════════════════════════════════════════════════
-  // Step 4: 説明欄
+  // Step 4: 条件付き書式（未分類は赤背景）
   // ═══════════════════════════════════════════════════
-  sheet.getRange('T1').setValue('💰 資金台帳（DB_Transactions）');
-  sheet.getRange('T1').setFontSize(14).setFontWeight('bold').setFontColor('#0b5394');
-  sheet.getRange('T2').setValue('');
-  sheet.getRange('T3').setValue('【原則】');
-  sheet.getRange('T4').setValue('✅ 真実は「実際に口座残高が動いた取引」だけ');
-  sheet.getRange('T5').setValue('✅ 入金はプラス、出金はマイナスで統一');
-  sheet.getRange('T6').setValue('✅ UPSIDERも銀行口座と同格');
-  sheet.getRange('T7').setValue('');
-  sheet.getRange('T8').setValue('【列の意味】');
-  sheet.getRange('T9').setValue('日付: 取引発生日');
-  sheet.getRange('T10').setValue('口座: 資金が動いた口座・サービス名');
-  sheet.getRange('T11').setValue('摘要: 取引内容');
-  sheet.getRange('T12').setValue('金額: 入金+/出金-');
-  sheet.getRange('T13').setValue('科目: 自動仕訳（DB_Master参照）');
-  sheet.getRange('T14').setValue('タグ: 詳細分類');
-  sheet.getRange('T15').setValue('UID: 一意キー（重複検知用）');
-  sheet.getRange('T16').setValue('転記元: データソース');
-  sheet.getRange('T17').setValue('');
-  sheet.getRange('T18').setValue('【禁止事項】');
-  sheet.getRange('T19').setValue('❌ このシートに直接入力しない');
-  sheet.getRange('T20').setValue('❌ 数式を変更しない');
+  const uncategorizedRule = SpreadsheetApp.newConditionalFormatRule()
+    .whenTextEqualTo('未分類')
+    .setBackground('#f4c7c3')
+    .setFontColor('#cc0000')
+    .setRanges([sheet.getRange('E2:E')])
+    .build();
+
+  const rules = sheet.getConditionalFormatRules();
+  rules.push(uncategorizedRule);
+  sheet.setConditionalFormatRules(rules);
+
+  // ═══════════════════════════════════════════════════
+  // Step 5: 未分類カウンター（T1セル）
+  // ═══════════════════════════════════════════════════
+  sheet.getRange('T1').setFormula('=IF(COUNTIF(E:E, "未分類")=0, "✅ 全て分類済み", "⚠️ 未分類: " & COUNTIF(E:E, "未分類") & "件")');
+  sheet.getRange('T1').setFontSize(14).setFontWeight('bold');
+
+  // 条件付き書式でカウンターの色を変更
+  const counterRule = SpreadsheetApp.newConditionalFormatRule()
+    .whenTextContains('未分類')
+    .setFontColor('#cc0000')
+    .setRanges([sheet.getRange('T1')])
+    .build();
+
+  const counterRuleGreen = SpreadsheetApp.newConditionalFormatRule()
+    .whenTextContains('全て分類済み')
+    .setFontColor('#2e7d32')
+    .setRanges([sheet.getRange('T1')])
+    .build();
+
+  const existingRules = sheet.getConditionalFormatRules();
+  existingRules.push(counterRule);
+  existingRules.push(counterRuleGreen);
+  sheet.setConditionalFormatRules(existingRules);
+
+  sheet.setColumnWidth(20, 200); // T列
+
+  // ═══════════════════════════════════════════════════
+  // Step 6: 説明欄
+  // ═══════════════════════════════════════════════════
+  sheet.getRange('T3').setValue('💰 資金台帳（DB_Transactions）');
+  sheet.getRange('T3').setFontSize(14).setFontWeight('bold').setFontColor('#0b5394');
+  sheet.getRange('T4').setValue('');
+  sheet.getRange('T5').setValue('【原則】');
+  sheet.getRange('T6').setValue('✅ 真実は「実際に口座残高が動いた取引」だけ');
+  sheet.getRange('T7').setValue('✅ 入金はプラス、出金はマイナスで統一');
+  sheet.getRange('T8').setValue('✅ UPSIDERも銀行口座と同格');
+  sheet.getRange('T9').setValue('');
+  sheet.getRange('T10').setValue('【列の意味】');
+  sheet.getRange('T11').setValue('日付: 取引発生日');
+  sheet.getRange('T12').setValue('口座: 資金が動いた口座・サービス名');
+  sheet.getRange('T13').setValue('摘要: 取引内容');
+  sheet.getRange('T14').setValue('金額: 入金+/出金-');
+  sheet.getRange('T15').setValue('科目: 自動仕訳（AUTO_CATEGORIZE）');
+  sheet.getRange('T16').setValue('UID: 一意キー（重複検知用）');
+  sheet.getRange('T17').setValue('転記元: データソース');
+  sheet.getRange('T18').setValue('');
+  sheet.getRange('T19').setValue('【禁止事項】');
+  sheet.getRange('T20').setValue('❌ このシートに直接入力しない');
+  sheet.getRange('T21').setValue('❌ 数式を変更しない');
 
   sheet.setColumnWidth(20, 280); // T列
 
@@ -264,50 +300,76 @@ function setupDB_Transactions() {
 }
 
 /**
- * 資金台帳データを確認
- * ※ ARRAYFORMULA により自動更新されるため、通常は不要
- * ※ 数式が壊れた場合の緊急復旧用
+ * 資金台帳データを確認 & 科目を自動更新
+ * v5.1: Apps Scriptで科目を一括更新
  */
 function refreshTransactions() {
-  showToast('🔄 確認中...', '資金台帳の状態を確認します', 2);
+  showToast('🔄 更新中...', '資金台帳を更新します', 2);
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName('DB_Transactions');
+  const transSheet = ss.getSheetByName('DB_Transactions');
+  const masterSheet = ss.getSheetByName('DB_Master');
 
-  if (!sheet) {
+  if (!transSheet) {
     showToast('❌ エラー', 'DB_Transactionsシートがありません', 5);
     return { success: false, message: 'シートが見つかりません' };
   }
 
+  if (!masterSheet) {
+    showToast('❌ エラー', 'DB_Masterシートがありません', 5);
+    return { success: false, message: 'DB_Masterが見つかりません' };
+  }
+
   try {
-    // A列のデータ行数を取得
-    const lastRow = sheet.getLastRow();
+    const lastRow = transSheet.getLastRow();
 
     if (lastRow < 2) {
       showToast('⚠️ データなし', 'Source_1〜6にデータを貼り付けてください', 5);
       return { success: false, message: 'データがありません' };
     }
 
-    // ARRAYFORMULAの存在確認
-    const a2Formula = sheet.getRange('A2').getFormula();
-    const d2Formula = sheet.getRange('D2').getFormula();
+    // DB_Masterからルールを取得（A列:キーワード, B列:科目）
+    const masterLastRow = masterSheet.getLastRow();
+    const masterData = masterSheet.getRange(2, 1, masterLastRow - 1, 2).getValues();
+    const rules = masterData.filter(row => row[0]); // キーワードがある行のみ
 
-    if (!a2Formula || !d2Formula) {
-      showToast('⚠️ 数式エラー', 'DB_Transactionsを再構築してください', 5);
-      return { success: false, message: '数式が見つかりません。resetTransactionsSheet()を実行してください。' };
-    }
+    Logger.log(`ルール数: ${rules.length}`);
 
-    showToast('✅ 正常稼働中！', `${lastRow - 1}行のデータが自動処理されています`, 5);
-    Logger.log(`DB_Transactions確認: ${lastRow - 1}行 (ARRAYFORMULA稼働中)`);
+    // C列（摘要）を取得
+    const descriptions = transSheet.getRange(2, 3, lastRow - 1, 1).getValues();
+
+    // 各行の科目を決定
+    const results = descriptions.map(row => {
+      const desc = row[0];
+      if (!desc) return [''];
+
+      // ルールを上から順にチェック（行順 = 優先度）
+      for (let i = 0; i < rules.length; i++) {
+        const keyword = rules[i][0];
+        const category = rules[i][1];
+
+        if (desc.includes(keyword)) {
+          return [category];
+        }
+      }
+
+      return ['未分類'];
+    });
+
+    // E列（科目）に一括書き込み
+    transSheet.getRange(2, 5, results.length, 1).setValues(results);
+
+    showToast('✅ 更新完了！', `${lastRow - 1}行の科目を更新しました`, 5);
+    Logger.log(`DB_Transactions更新: ${lastRow - 1}行`);
 
     return {
       success: true,
-      message: `${lastRow - 1}行処理完了（自動更新中）`,
+      message: `${lastRow - 1}行処理完了`,
       rowCount: lastRow - 1
     };
   } catch (error) {
     showToast('❌ エラー', error.message, 10);
-    Logger.log('資金台帳確認エラー: ' + error);
+    Logger.log('資金台帳更新エラー: ' + error);
     return { success: false, message: error.message };
   }
 }
@@ -315,7 +377,7 @@ function refreshTransactions() {
 /**
  * DB_Master シート（脳みそ）
  * 自動仕訳のルールを管理
- * v5.1: 優先度削除、判定カテゴリ→科目に統一
+ * v5.2: タグ削除、キーワードと科目のみ
  */
 function setupDB_Master() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -330,8 +392,8 @@ function setupDB_Master() {
     return;
   }
 
-  // ヘッダー（優先度削除、判定カテゴリ→科目）
-  const headers = ['検索キーワード', '科目', '詳細タグ'];
+  // ヘッダー（キーワードと科目のみ）
+  const headers = ['検索キーワード', '科目'];
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
 
   const headerRange = sheet.getRange(1, 1, 1, headers.length);
@@ -340,32 +402,31 @@ function setupDB_Master() {
   headerRange.setFontWeight('bold');
   headerRange.setHorizontalAlignment('center');
 
-  // サンプルデータ（優先度削除、科目統一）
+  // サンプルデータ（キーワードと科目のみ）
   const sampleData = [
-    ['振込手数料', '支払手数料', '銀行手数料'],
-    ['UnivaPay', '売上', '決済入金'],
-    ['UPSIDER', '立替金', 'カード利用'],
-    ['GOOGLE', '広告宣伝費', 'Google広告'],
-    ['カ）オールエーアイ', '外注費', 'All AI'],
-    ['振込＊モカ', '役員報酬', '代表報酬'],
-    ['PayPay', '売上', 'PayPay決済'],
-    ['Amazon', '消耗品費', 'Amazon購入'],
-    ['さくら', '通信費', 'さくらサーバー'],
-    ['Adobe', '通信費', 'Adobe CC'],
-    ['みずほ', '支払手数料', 'みずほ銀行'],
-    ['SBI', '支払手数料', 'SBI銀行'],
-    ['楽天', '支払手数料', '楽天銀行'],
-    ['Notion', '通信費', 'Notion利用料'],
-    ['GitHub', '通信費', 'GitHub利用料'],
-    ['AWS', '通信費', 'AWS利用料']
+    ['振込手数料', '支払手数料'],
+    ['UnivaPay', '売上'],
+    ['UPSIDER', '立替金'],
+    ['GOOGLE', '広告宣伝費'],
+    ['カ）オールエーアイ', '外注費'],
+    ['振込＊モカ', '役員報酬'],
+    ['PayPay', '売上'],
+    ['Amazon', '消耗品費'],
+    ['さくら', '通信費'],
+    ['Adobe', '通信費'],
+    ['みずほ', '支払手数料'],
+    ['SBI', '支払手数料'],
+    ['楽天', '支払手数料'],
+    ['Notion', '通信費'],
+    ['GitHub', '通信費'],
+    ['AWS', '通信費']
   ];
 
-  sheet.getRange(2, 1, sampleData.length, 3).setValues(sampleData);
+  sheet.getRange(2, 1, sampleData.length, 2).setValues(sampleData);
 
   // 列幅調整
   sheet.setColumnWidth(1, 200);
   sheet.setColumnWidth(2, 150);
-  sheet.setColumnWidth(3, 200);
 
   // 使い方説明
   sheet.getRange('E1').setValue('🧠 自動仕訳の脳みそ');
@@ -1006,6 +1067,47 @@ function previewKeywordMatch(keyword) {
 }
 
 /**
+ * カスタム関数: 自動分類
+ * E2セルに =AUTO_CATEGORIZE(C2:C) と入力
+ *
+ * @param {Array} descriptionRange - C列（摘要）の範囲
+ * @return {Array} 科目の1次元配列
+ * @customfunction
+ */
+function AUTO_CATEGORIZE(descriptionRange) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const masterSheet = ss.getSheetByName('DB_Master');
+
+  if (!masterSheet) {
+    return descriptionRange.map(() => ['エラー: DB_Masterなし']);
+  }
+
+  // DB_Masterからルールを取得（A列:キーワード, B列:科目）
+  const masterLastRow = masterSheet.getLastRow();
+  if (masterLastRow < 2) {
+    return descriptionRange.map(() => ['未分類']);
+  }
+
+  const rules = masterSheet.getRange(2, 1, masterLastRow - 1, 2).getValues()
+    .filter(row => row[0]); // キーワードがある行のみ
+
+  // 各摘要を処理
+  return descriptionRange.map(row => {
+    const desc = row[0];
+    if (!desc) return [''];
+
+    // ルールを上から順にチェック（行順 = 優先度）
+    for (const [keyword, category] of rules) {
+      if (desc.toString().includes(keyword.toString())) {
+        return [category || '未分類'];
+      }
+    }
+
+    return ['未分類'];
+  });
+}
+
+/**
  * 選択中の行の摘要を取得
  */
 function getSelectedDescription() {
@@ -1100,6 +1202,8 @@ function getUncategorizedTransactions() {
 
   try {
     const lastRow = sheet.getLastRow();
+    Logger.log(`DB_Transactions lastRow: ${lastRow}`);
+
     if (lastRow < 2) {
       return { success: true, data: [], message: 'データがありません' };
     }
@@ -1107,6 +1211,12 @@ function getUncategorizedTransactions() {
     // A列〜H列のデータを取得
     const dataRange = sheet.getRange(2, 1, lastRow - 1, 8);
     const values = dataRange.getValues();
+
+    Logger.log(`Total rows: ${values.length}`);
+    Logger.log(`First 3 rows:`);
+    for (let i = 0; i < Math.min(3, values.length); i++) {
+      Logger.log(`Row ${i + 2}: date=${values[i][0]}, account=${values[i][1]}, desc=${values[i][2]}, amount=${values[i][3]}, category=[${values[i][4]}], tag=${values[i][5]}`);
+    }
 
     // 科目が「未分類」の行のみフィルタ（グルーピングなし、1件ずつ）
     const uncategorized = values
@@ -1121,7 +1231,15 @@ function getUncategorizedTransactions() {
         uid: row[6],
         source: row[7]
       }))
-      .filter(item => item.category === '未分類');
+      .filter(item => {
+        const match = item.category === '未分類';
+        if (match) {
+          Logger.log(`Matched row ${item.rowNumber}: category=[${item.category}]`);
+        }
+        return match;
+      });
+
+    Logger.log(`Uncategorized count: ${uncategorized.length}`);
 
     return {
       success: true,
