@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #0b5394 0%, #1a73e8 100%);
+      color: #333;
+      padding: 0;
+      overflow-x: hidden;
+    }
+
+    .header {
+      background: rgba(255, 255, 255, 0.95);
+      padding: 20px;
+      text-align: center;
+      border-bottom: 3px solid #0b5394;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .header h1 {
+      font-size: 18px;
+      color: #0b5394;
+      margin-bottom: 5px;
+    }
+
+    .header p {
+      font-size: 11px;
+      color: #666;
+    }
+
+    /* タブナビゲーション */
+    .tab-nav {
+      display: flex;
+      background: white;
+      border-bottom: 2px solid #e4e7eb;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 12px 8px;
+      border: none;
+      background: #f5f7fa;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      color: #666;
+      transition: all 0.3s;
+      border-bottom: 3px solid transparent;
+    }
+
+    .tab-btn:hover {
+      background: #e4e7eb;
+    }
+
+    .tab-btn.active {
+      background: white;
+      color: #0b5394;
+      border-bottom: 3px solid #0b5394;
+    }
+
+    .container {
+      padding: 15px;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .section {
+      background: white;
+      border-radius: 12px;
+      padding: 18px;
+      margin-bottom: 15px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+
+    .section-title {
+      font-size: 15px;
+      font-weight: bold;
+      color: #0b5394;
+      margin-bottom: 12px;
+    }
+
+    .form-group {
+      margin-bottom: 15px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 5px;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    input[type="date"],
+    select,
+    textarea {
+      width: 100%;
+      padding: 10px;
+      border: 2px solid #e4e7eb;
+      border-radius: 8px;
+      font-size: 13px;
+      transition: border-color 0.3s;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      outline: none;
+      border-color: #0b5394;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 60px;
+      font-family: monospace;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      margin-top: 10px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #0b5394 0%, #1a73e8 100%);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(11, 83, 148, 0.3);
+    }
+
+    .btn-secondary {
+      background: #f5f7fa;
+      color: #666;
+    }
+
+    .btn-secondary:hover {
+      background: #e4e7eb;
+    }
+
+    .uncategorized-list {
+      max-height: 400px;
+      overflow-y: auto;
+      margin-top: 15px;
+    }
+
+    .transaction-item {
+      background: #f5f7fa;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 10px;
+      border-left: 4px solid #e67e22;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .transaction-item:hover {
+      background: #e4e7eb;
+      transform: translateX(5px);
+    }
+
+    .transaction-item.selected {
+      background: #fff3e0;
+      border-left-color: #ff6d00;
+    }
+
+    .transaction-date {
+      font-size: 11px;
+      color: #999;
+    }
+
+    .transaction-desc {
+      font-size: 13px;
+      font-weight: 600;
+      color: #333;
+      margin: 5px 0;
+    }
+
+    .transaction-amount {
+      font-size: 14px;
+      font-weight: bold;
+      color: #e67e22;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      background: #e67e22;
+      color: white;
+      margin-bottom: 10px;
+    }
+
+    .help-text {
+      font-size: 11px;
+      color: #999;
+      margin-top: 5px;
+    }
+
+    .preview-box {
+      background: #f5f7fa;
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 10px;
+      text-align: center;
+    }
+
+    .preview-count {
+      font-size: 24px;
+      font-weight: bold;
+      color: #0b5394;
+    }
+
+    .template-list {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+
+    .template-btn {
+      padding: 10px;
+      background: #f5f7fa;
+      border: 2px solid #e4e7eb;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      transition: all 0.3s;
+    }
+
+    .template-btn:hover {
+      background: #e4e7eb;
+      border-color: #0b5394;
+    }
+  </style>
+</head>
+<body>
+  <!-- ヘッダー -->
+  <div class="header">
+    <h1>💰 CF自動更新 v5.0</h1>
+    <p>Cash Flow管理システム</p>
+  </div>
+
+  <!-- タブナビゲーション -->
+  <div class="tab-nav">
+    <button class="tab-btn active" onclick="switchTab('uncategorized')">未分類</button>
+    <button class="tab-btn" onclick="switchTab('plan')">Plan登録</button>
+    <button class="tab-btn" onclick="switchTab('review')">月次レビュー</button>
+  </div>
+
+  <div class="container">
+    <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+    <!-- タブ1: 未分類バスター -->
+    <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+    <div id="tab-uncategorized" class="tab-content active">
+      <div class="section">
+        <div class="section-title">🔍 未分類取引</div>
+        <button class="btn btn-primary" onclick="loadUncategorized()">未分類を読み込み</button>
+        <div id="uncategorized-count" class="badge" style="display: none; margin-top: 10px;">0件</div>
+        <div id="uncategorized-list" class="uncategorized-list"></div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">📝 キーワードルール登録</div>
+        <div class="form-group">
+          <label>選択した取引の摘要</label>
+          <textarea id="selected-description" readonly placeholder="上の未分類取引をクリックしてください"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>キーワード（正規表現可）</label>
+          <input type="text" id="keyword-input" placeholder="例: AMAZON|アマゾン">
+          <div class="help-text">部分一致で検索されます</div>
+        </div>
+
+        <button class="btn btn-secondary" onclick="previewKeyword()">プレビュー</button>
+        <div id="keyword-preview"></div>
+
+        <div class="form-group">
+          <label>科目</label>
+          <select id="keyword-category">
+            <option value="売上">売上</option>
+            <option value="広告宣伝費">広告宣伝費</option>
+            <option value="外注費">外注費</option>
+            <option value="消耗品費">消耗品費</option>
+            <option value="通信費">通信費</option>
+            <option value="支払手数料">支払手数料</option>
+            <option value="雑費">雑費</option>
+            <option value="役員報酬">役員報酬</option>
+            <option value="役員借入金">役員借入金</option>
+            <option value="立替金">立替金</option>
+            <option value="家賃">家賃</option>
+            <option value="人件費">人件費</option>
+            <option value="その他収入">その他収入</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>タグ（任意）</label>
+          <input type="text" id="keyword-tag" placeholder="例: Google広告">
+        </div>
+
+        <button class="btn btn-primary" onclick="registerKeyword()">ルールを登録</button>
+      </div>
+    </div>
+
+    <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+    <!-- タブ2: Plan登録 -->
+    <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+    <div id="tab-plan" class="tab-content">
+      <div class="section">
+        <div class="section-title">📅 テンプレート選択</div>
+        <div class="template-list">
+          <button class="template-btn" onclick="loadTemplate('rent')">家賃</button>
+          <button class="template-btn" onclick="loadTemplate('salary')">人件費</button>
+          <button class="template-btn" onclick="loadTemplate('president')">代表枠</button>
+          <button class="template-btn" onclick="loadTemplate('upsider')">UPSIDER枠</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">📝 予定取引登録</div>
+
+        <div class="form-group">
+          <label>予定日</label>
+          <input type="date" id="plan-date">
+        </div>
+
+        <div class="form-group">
+          <label>口座</label>
+          <select id="plan-account">
+            <option value="みずほ銀行">みずほ銀行</option>
+            <option value="SBI銀行">SBI銀行</option>
+            <option value="楽天銀行">楽天銀行</option>
+            <option value="UPSIDER">UPSIDER</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>科目</label>
+          <select id="plan-category">
+            <option value="家賃">家賃</option>
+            <option value="人件費">人件費</option>
+            <option value="広告宣伝費">広告宣伝費</option>
+            <option value="外注費">外注費</option>
+            <option value="売上">売上</option>
+            <option value="その他収入">その他収入</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>タグ</label>
+          <input type="text" id="plan-tag" placeholder="例: 事務所家賃">
+        </div>
+
+        <div class="form-group">
+          <label>予定金額（マイナスで出金）</label>
+          <input type="number" id="plan-amount" placeholder="例: -200000">
+        </div>
+
+        <div class="form-group">
+          <label>繰り返し（任意）</label>
+          <input type="text" id="plan-repeat" placeholder="例: 毎月25日">
+        </div>
+
+        <div class="form-group">
+          <label>メモ（任意）</label>
+          <input type="text" id="plan-memo" placeholder="例: 代表枠">
+        </div>
+
+        <button class="btn btn-primary" onclick="registerPlan()">Plan登録</button>
+      </div>
+    </div>
+
+    <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+    <!-- タブ3: 月次レビュー -->
+    <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+    <div id="tab-review" class="tab-content">
+      <div class="section">
+        <div class="section-title">📊 月次予実レビュー</div>
+        <div class="form-group">
+          <label>対象月</label>
+          <input type="month" id="review-month">
+        </div>
+        <button class="btn btn-primary" onclick="loadMonthlyReview()">レビュー表示</button>
+        <div id="review-result" style="margin-top: 15px;"></div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">💡 Phase 2で実装予定</div>
+        <p style="font-size: 12px; color: #999;">
+          ・実績 vs 予定の差異分析<br>
+          ・口座別の残高推移<br>
+          ・科目別の集計グラフ
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // タブ切り替え
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    function switchTab(tabName) {
+      // すべてのタブボタンとコンテンツを非アクティブに
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+      // 選択されたタブをアクティブに
+      event.target.classList.add('active');
+      document.getElementById('tab-' + tabName).classList.add('active');
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // タブ1: 未分類バスター
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    let selectedTransaction = null;
+
+    function loadUncategorized() {
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (!result.success) {
+            alert('エラー: ' + result.message);
+            return;
+          }
+
+          const countBadge = document.getElementById('uncategorized-count');
+          const listDiv = document.getElementById('uncategorized-list');
+
+          if (result.totalCount === 0) {
+            listDiv.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">未分類取引はありません</p>';
+            countBadge.style.display = 'none';
+            return;
+          }
+
+          countBadge.textContent = result.totalCount + '件 → ' + result.groupCount + 'パターン';
+          countBadge.style.display = 'inline-block';
+
+          let html = '';
+          result.data.forEach(group => {
+            const amountColor = group.totalAmount >= 0 ? '#2e7d32' : '#e67e22';
+            html += `
+              <div class="transaction-item" onclick="selectGroupTransaction('${escapeHtml(group.description)}')">
+                <div class="transaction-date">
+                  <span style="background: #0b5394; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: bold;">${group.count}件</span>
+                  ${group.accounts}
+                </div>
+                <div class="transaction-desc">${escapeHtml(group.description)}</div>
+                <div class="transaction-amount" style="color: ${amountColor};">合計: ¥${group.totalAmount.toLocaleString()}</div>
+              </div>
+            `;
+          });
+
+          listDiv.innerHTML = html;
+        })
+        .getUncategorizedTransactions();
+    }
+
+    function selectGroupTransaction(description) {
+      selectedTransaction = null; // グループ選択なのでrowNumberは不要
+      document.getElementById('selected-description').value = description;
+      // キーワード入力欄に摘要を自動入力（編集可能）
+      document.getElementById('keyword-input').value = description;
+
+      // 選択状態を視覚化
+      document.querySelectorAll('.transaction-item').forEach(item => {
+        item.classList.remove('selected');
+      });
+      event.currentTarget.classList.add('selected');
+    }
+
+    function selectTransaction(rowNumber, description) {
+      selectedTransaction = rowNumber;
+      document.getElementById('selected-description').value = description;
+
+      // 選択状態を視覚化
+      document.querySelectorAll('.transaction-item').forEach(item => {
+        item.classList.remove('selected');
+      });
+      event.currentTarget.classList.add('selected');
+    }
+
+    function previewKeyword() {
+      const keyword = document.getElementById('keyword-input').value;
+      if (!keyword) {
+        alert('キーワードを入力してください');
+        return;
+      }
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          const previewDiv = document.getElementById('keyword-preview');
+          previewDiv.innerHTML = `
+            <div class="preview-box">
+              <div class="preview-count">${result.count}件</div>
+              <div style="font-size: 12px; color: #666; margin-top: 5px;">該当する取引</div>
+            </div>
+          `;
+        })
+        .previewKeywordMatch(keyword);
+    }
+
+    function registerKeyword() {
+      const keyword = document.getElementById('keyword-input').value;
+      const category = document.getElementById('keyword-category').value;
+      const tag = document.getElementById('keyword-tag').value;
+
+      if (!keyword || !category) {
+        alert('キーワードと科目を入力してください');
+        return;
+      }
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            alert('✅ ルールを登録しました！');
+            // フォームをクリア
+            document.getElementById('keyword-input').value = '';
+            document.getElementById('keyword-tag').value = '';
+            document.getElementById('keyword-preview').innerHTML = '';
+            // 未分類を再読み込み
+            loadUncategorized();
+          } else {
+            alert('エラー: ' + result.message);
+          }
+        })
+        .registerKeywordRule(keyword, category, tag, 10);
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // タブ2: Plan登録
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    function loadTemplate(type) {
+      const templates = {
+        rent: {
+          account: 'みずほ銀行',
+          category: '家賃',
+          tag: '事務所家賃',
+          amount: -200000,
+          repeat: '毎月25日'
+        },
+        salary: {
+          account: 'みずほ銀行',
+          category: '人件費',
+          tag: '給与',
+          amount: -300000,
+          repeat: '毎月末日'
+        },
+        president: {
+          account: 'UPSIDER',
+          category: '広告宣伝費',
+          tag: 'Google広告',
+          amount: -150000,
+          repeat: '',
+          memo: '代表枠'
+        },
+        upsider: {
+          account: 'UPSIDER',
+          category: '外注費',
+          tag: 'All AI',
+          amount: -100000,
+          repeat: '',
+          memo: 'UPSIDER枠'
+        }
+      };
+
+      const template = templates[type];
+      if (!template) return;
+
+      document.getElementById('plan-account').value = template.account;
+      document.getElementById('plan-category').value = template.category;
+      document.getElementById('plan-tag').value = template.tag;
+      document.getElementById('plan-amount').value = template.amount;
+      document.getElementById('plan-repeat').value = template.repeat || '';
+      document.getElementById('plan-memo').value = template.memo || '';
+    }
+
+    function registerPlan() {
+      const date = document.getElementById('plan-date').value;
+      const account = document.getElementById('plan-account').value;
+      const category = document.getElementById('plan-category').value;
+      const tag = document.getElementById('plan-tag').value;
+      const amount = document.getElementById('plan-amount').value;
+      const repeat = document.getElementById('plan-repeat').value;
+      const memo = document.getElementById('plan-memo').value;
+
+      if (!date || !account || !category || !amount) {
+        alert('予定日、口座、科目、金額は必須です');
+        return;
+      }
+
+      const planData = {
+        date: date,
+        account: account,
+        category: category,
+        tag: tag,
+        amount: parseFloat(amount),
+        repeat: repeat,
+        memo: memo
+      };
+
+      // GAS側で実装予定
+      alert('✅ Planを登録しました！（Phase 2で実装）\n' + JSON.stringify(planData, null, 2));
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // タブ3: 月次レビュー
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    function loadMonthlyReview() {
+      const month = document.getElementById('review-month').value;
+      if (!month) {
+        alert('対象月を選択してください');
+        return;
+      }
+
+      const resultDiv = document.getElementById('review-result');
+      resultDiv.innerHTML = '<p style="text-align: center; color: #999;">Phase 2で実装予定</p>';
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ユーティリティ
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    function escapeHtml(text) {
+      if (!text) return '';
+      return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function formatDate(date) {
+      if (!date) return '';
+      const d = new Date(date);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    // ページ読み込み時に今月をセット
+    document.addEventListener('DOMContentLoaded', function() {
+      const today = new Date();
+      const month = String(today.getMonth() + 1).padStart(2, '0');
+      document.getElementById('review-month').value = `${today.getFullYear()}-${month}`;
+    });
+  </script>
+</body>
+</html>
