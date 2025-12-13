@@ -125,9 +125,9 @@ function setupSourceSheet(num) {
   sheet.setColumnWidth(7, 100);  // ステータス
   sheet.setColumnWidth(8, 100);  // 取引No
 
-  // K1セルに大きくメモ欄を作成（F2から自動取得）
+  // K1セルに銀行名を自動表示（F2から自動取得）
   const memoCell = sheet.getRange('K1');
-  memoCell.setFormula('=IF(F2="", "ここは【　　　　　　】", "ここは【" & REGEXEXTRACT(F2, "(.+?銀行)") & "】")');
+  memoCell.setFormula('=IF(F2="", "", REGEXEXTRACT(F2, "(.+?銀行)"))');
   memoCell.setFontSize(14);
   memoCell.setFontWeight('bold');
   memoCell.setFontColor(colors[num - 1]);
@@ -135,13 +135,13 @@ function setupSourceSheet(num) {
   memoCell.setBorder(true, true, true, true, true, true, '#ff6d00', SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
 
   // 使い方説明（K列以降）
-  sheet.getRange('K2').setValue('💡 使い方');
-  sheet.getRange('K3').setValue(`1. 上のメモ欄は連携サービス名（F2）から自動取得`);
-  sheet.getRange('K4').setValue('2. MoneyForwardで該当口座を絞り込み');
-  sheet.getRange('K5').setValue('3. 全期間を選択してコピー');
-  sheet.getRange('K6').setValue('4. A2セル（ヘッダーの下）に貼り付け');
-  sheet.getRange('K7').setValue('5. A列は空欄でOK（チェックボックス用）');
-  sheet.getRange('K8').setValue('6. 毎回全期間上書きでOK！');
+  sheet.getRange('K2').setValue('上記は銀行名です。');
+  sheet.getRange('K3').setValue(`💡 使い方`);
+  sheet.getRange('K4').setValue('1. MoneyForwardで該当口座を絞り込み');
+  sheet.getRange('K5').setValue('2. 全期間を選択してコピー');
+  sheet.getRange('K6').setValue('3. A2セル（ヘッダーの下）に貼り付け');
+  sheet.getRange('K7').setValue('4. A列は空欄でOK（チェックボックス用）');
+  sheet.getRange('K8').setValue('5. 毎回全期間上書きでOK！');
   sheet.getRange('K9').setValue('');
   sheet.getRange('K10').setValue('⚠️ 注意: A1ヘッダーは削除しないこと');
 
