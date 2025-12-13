@@ -127,7 +127,7 @@ function setupSourceSheet(num) {
 
   // K1セルに大きくメモ欄を作成（F2から自動取得）
   const memoCell = sheet.getRange('K1');
-  memoCell.setFormula('=IF(F2="", "ここは【　　　　　　】", "ここは【" & F2 & "】")');
+  memoCell.setFormula('=IF(F2="", "ここは【　　　　　　】", "ここは【" & REGEXEXTRACT(F2, "(.+?銀行)") & "】")');
   memoCell.setFontSize(14);
   memoCell.setFontWeight('bold');
   memoCell.setFontColor(colors[num - 1]);
