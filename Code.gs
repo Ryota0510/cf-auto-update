@@ -7,8 +7,6 @@
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
   ui.createMenu('💰 CF自動更新')
-    .addItem('🎛️ コントロールパネルを開く', 'showSidebar')
-    .addSeparator()
     .addItem('🚀 システム初期化', 'initializeDatabase')
     .addSeparator()
     .addSubMenu(ui.createMenu('🏦 データ管理')
@@ -25,17 +23,6 @@ function onOpen() {
     .addToUi();
 
   showToast('💰 CF自動更新 v5.3', 'Cash Flow管理 稼働中', 5);
-}
-
-/**
- * HTMLサイドバーを表示
- */
-function showSidebar() {
-  const html = HtmlService.createHtmlOutputFromFile('Sidebar')
-    .setTitle('💰 CF自動更新 v5.0')
-    .setWidth(400);
-  SpreadsheetApp.getUi().showSidebar(html);
-  showToast('🎛️ コントロールパネル', 'サイドバーを開きました', 2);
 }
 
 /**
@@ -658,8 +645,8 @@ function setupInput_CashPlan() {
   sheet.getRange('J5').setValue('✅ 家賃/人件費/代表枠/UPSIDER枠など');
   sheet.getRange('J6').setValue('');
   sheet.getRange('J7').setValue('【使い方】');
-  sheet.getRange('J8').setValue('サイドバーから「Plan登録」で追加');
-  sheet.getRange('J9').setValue('テンプレート登録で繰り返し入力を簡略化');
+  sheet.getRange('J8').setValue('このシートに直接入力して予定を追加');
+  sheet.getRange('J9').setValue('繰り返し項目は「繰り返し」列に記入');
 
   sheet.setColumnWidth(10, 280); // J列
 
@@ -1040,71 +1027,5 @@ function getAllCategories() {
   } catch (error) {
     Logger.log('科目一覧取得エラー: ' + error);
     return { success: false, categories: [] };
-  }
-}
-
-/**
- * 未分類一覧を取得（個別表示版）
- * サイドバーの「未分類バスター」タブ用
- * v5.1: グルーピングせず、1件ずつ表示
- */
-function getUncategorizedTransactions() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName('DB_Transactions');
-
-  if (!sheet) {
-    return { success: false, data: [], message: 'シートが見つかりません' };
-  }
-
-  try {
-    const lastRow = sheet.getLastRow();
-    Logger.log(`DB_Transactions lastRow: ${lastRow}`);
-
-    if (lastRow < 2) {
-      return { success: true, data: [], message: 'データがありません' };
-    }
-
-    // A列〜H列のデータを取得
-    const dataRange = sheet.getRange(2, 1, lastRow - 1, 8);
-    const values = dataRange.getValues();
-
-    Logger.log(`Total rows: ${values.length}`);
-    Logger.log(`First 3 rows:`);
-    for (let i = 0; i < Math.min(3, values.length); i++) {
-      Logger.log(`Row ${i + 2}: date=${values[i][0]}, account=${values[i][1]}, desc=${values[i][2]}, amount=${values[i][3]}, category=[${values[i][4]}], tag=${values[i][5]}`);
-    }
-
-    // 科目が「未分類」の行のみフィルタ（グルーピングなし、1件ずつ）
-    const uncategorized = values
-      .map((row, index) => ({
-        rowNumber: index + 2,
-        date: row[0],
-        account: row[1],
-        description: row[2],
-        amount: row[3],
-        category: row[4],
-        tag: row[5],
-        uid: row[6],
-        source: row[7]
-      }))
-      .filter(item => {
-        const match = item.category === '未分類';
-        if (match) {
-          Logger.log(`Matched row ${item.rowNumber}: category=[${item.category}]`);
-        }
-        return match;
-      });
-
-    Logger.log(`Uncategorized count: ${uncategorized.length}`);
-
-    return {
-      success: true,
-      data: uncategorized,
-      count: uncategorized.length,
-      message: `${uncategorized.length}件の未分類取引`
-    };
-  } catch (error) {
-    Logger.log('未分類取得エラー: ' + error);
-    return { success: false, data: [], message: error.message };
   }
 }
