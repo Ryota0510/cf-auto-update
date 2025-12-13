@@ -7,8 +7,6 @@
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
   ui.createMenu('💰 CF自動更新')
-    .addItem('🎛️ コントロールパネルを開く', 'showSidebar')
-    .addSeparator()
     .addItem('🚀 システム初期化', 'initializeDatabase')
     .addSeparator()
     .addSubMenu(ui.createMenu('🏦 データ管理')
@@ -27,17 +25,6 @@ function onOpen() {
     .addToUi();
 
   showToast('💰 CF自動更新 v5.3', 'Cash Flow管理 稼働中', 5);
-}
-
-/**
- * HTMLサイドバーを表示
- */
-function showSidebar() {
-  const html = HtmlService.createHtmlOutputFromFile('Sidebar')
-    .setTitle('💰 CF自動更新 v5.0')
-    .setWidth(400);
-  SpreadsheetApp.getUi().showSidebar(html);
-  showToast('🎛️ コントロールパネル', 'サイドバーを開きました', 2);
 }
 
 /**
