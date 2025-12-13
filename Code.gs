@@ -13,18 +13,20 @@ function onOpen() {
     .addSeparator()
     .addSubMenu(ui.createMenu('🏦 データ管理')
       .addItem('資金台帳確認', 'refreshTransactions')
+      .addItem('予算更新', 'updateBudget')
       .addItem('振替検出', 'detectTransfers')
       .addItem('DB_Transactions再構築', 'resetTransactionsSheet'))
     .addSeparator()
     .addSubMenu(ui.createMenu('📊 表示切替')
       .addItem('Month_Viewを開く', 'openMonthView')
       .addItem('DB_Transactionsを開く', 'openTransactions')
+      .addItem('DB_Budgetを開く', 'openBudget')
       .addItem('Settingsを開く', 'openSettings'))
     .addSeparator()
     .addItem('📋 全シート状態確認', 'checkAllSheets')
     .addToUi();
 
-  showToast('💰 CF自動更新 v5.0', 'Cash Flow管理 稼働中', 5);
+  showToast('💰 CF自動更新 v5.3', 'Cash Flow管理 稼働中', 5);
 }
 
 /**
@@ -66,6 +68,7 @@ function initializeDatabase() {
     // 新アーキテクチャのシート群
     setupDB_Transactions();  // 資金台帳（旧DB_Integrated）
     setupDB_Master();        // キーワードルール
+    setupDB_Budget();        // 予算管理（UPSIDER・現金）
     setupInput_CashPlan();   // 予定取引（新規）
     setupCalendar();         // 日付スパイン（新規）
     setupSettings();         // 設定（対象月・期首残高）
@@ -76,7 +79,7 @@ function initializeDatabase() {
     return {
       success: true,
       message: '初期化完了',
-      sheets: ['Source_1-6', 'DB_Transactions', 'DB_Master', 'Input_CashPlan', 'Calendar', 'Settings', 'Month_View']
+      sheets: ['Source_1-6', 'DB_Transactions', 'DB_Master', 'DB_Budget', 'Input_CashPlan', 'Calendar', 'Settings', 'Month_View']
     };
   } catch (error) {
     showToast('❌ エラー', error.message, 10);
@@ -375,6 +378,75 @@ function refreshTransactions() {
 }
 
 /**
+ * 予算更新（残日数・1日使用可能額を計算）
+ * v5.3: 週1回実行想定
+ */
+function updateBudget() {
+  showToast('🔄 予算更新中...', '残日数と1日使用可能額を計算します', 2);
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('DB_Budget');
+
+  if (!sheet) {
+    showToast('❌ エラー', 'DB_Budgetシートがありません', 5);
+    return { success: false, message: 'シートが見つかりません' };
+  }
+
+  try {
+    // 今日の日付を取得
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth(); // 0-11
+
+    // 月末日を取得
+    const lastDayOfMonth = new Date(year, month + 1, 0);
+    const lastDay = lastDayOfMonth.getDate();
+    const currentDay = today.getDate();
+
+    // 残日数を計算（今日を含む）
+    const remainingDays = lastDay - currentDay + 1;
+
+    Logger.log(`今日: ${year}/${month + 1}/${currentDay}, 月末: ${lastDay}, 残日数: ${remainingDays}`);
+
+    // 各行をチェック（2行目から）
+    const lastRow = sheet.getLastRow();
+    for (let row = 2; row <= lastRow; row++) {
+      const target = sheet.getRange(row, 1).getValue(); // A列（対象）
+      const monthlyBudget = sheet.getRange(row, 2).getValue(); // B列（月間予算）
+
+      // 月間予算がある場合のみ計算（UPSIDER・現金）
+      if (monthlyBudget && monthlyBudget > 0) {
+        // D列: 残日数
+        sheet.getRange(row, 4).setValue(remainingDays);
+
+        // E列: 1日使用可能額 = 月間予算 ÷ 残日数
+        const dailyBudget = Math.floor(monthlyBudget / remainingDays);
+        sheet.getRange(row, 5).setValue(dailyBudget);
+
+        Logger.log(`${target}: 月間予算=${monthlyBudget}, 残日数=${remainingDays}, 1日使用可=${dailyBudget}`);
+      } else {
+        // 月間予算がない場合はクリア
+        sheet.getRange(row, 4).setValue('');
+        sheet.getRange(row, 5).setValue('');
+      }
+    }
+
+    showToast('✅ 予算更新完了！', `残り${remainingDays}日`, 5);
+    Logger.log(`予算更新完了: 残日数=${remainingDays}`);
+
+    return {
+      success: true,
+      message: '予算更新完了',
+      remainingDays: remainingDays
+    };
+  } catch (error) {
+    showToast('❌ エラー', error.message, 10);
+    Logger.log('予算更新エラー: ' + error);
+    return { success: false, message: error.message };
+  }
+}
+
+/**
  * DB_Master シート（脳みそ）
  * 自動仕訳のルールを管理
  * v5.2: タグ削除、キーワードと科目のみ
@@ -449,6 +521,91 @@ function setupDB_Master() {
   sheet.setColumnWidth(5, 280); // E列
 
   Logger.log('DB_Master 作成完了（脳みそ v5.1）');
+}
+
+/**
+ * DB_Budget シート（予算管理）
+ * v5.3: UPSIDER・現金の月間予算管理
+ */
+function setupDB_Budget() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName('DB_Budget');
+
+  if (!sheet) {
+    sheet = ss.insertSheet('DB_Budget');
+  }
+
+  if (sheet.getRange('A1').getValue() !== '') {
+    Logger.log('DB_Budget は既に設定済み');
+    return;
+  }
+
+  // ヘッダー
+  const headers = ['対象', '月間予算', '実残高（MF転記）', '残日数', '1日使用可能額'];
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+
+  const headerRange = sheet.getRange(1, 1, 1, headers.length);
+  headerRange.setBackground('#27ae60');
+  headerRange.setFontColor('#FFFFFF');
+  headerRange.setFontWeight('bold');
+  headerRange.setHorizontalAlignment('center');
+
+  // サンプルデータ
+  const sampleData = [
+    ['UPSIDER', 500000, 450000, '', ''], // 残日数・1日使用可能額は自動計算
+    ['現金', 300000, 280000, '', ''],
+    ['みずほ銀行', '', 1200000, '', ''],  // 月間予算なし、実残高のみ
+    ['SBI銀行', '', 800000, '', ''],
+    ['楽天銀行', '', 500000, '', '']
+  ];
+
+  sheet.getRange(2, 1, sampleData.length, 5).setValues(sampleData);
+
+  // 列幅調整
+  sheet.setColumnWidth(1, 150);  // 対象
+  sheet.setColumnWidth(2, 120);  // 月間予算
+  sheet.setColumnWidth(3, 150);  // 実残高
+  sheet.setColumnWidth(4, 100);  // 残日数
+  sheet.setColumnWidth(5, 150);  // 1日使用可能額
+
+  // 数値フォーマット
+  sheet.getRange('B:C').setNumberFormat('#,##0');
+  sheet.getRange('E:E').setNumberFormat('#,##0');
+
+  // 条件付き書式（1日使用可能額が1万円未満で警告）
+  const warningRule = SpreadsheetApp.newConditionalFormatRule()
+    .whenNumberLessThan(10000)
+    .setBackground('#fff3cd')
+    .setFontColor('#856404')
+    .setRanges([sheet.getRange('E2:E6')])
+    .build();
+
+  const rules = sheet.getConditionalFormatRules();
+  rules.push(warningRule);
+  sheet.setConditionalFormatRules(rules);
+
+  // 使い方説明
+  sheet.getRange('G1').setValue('💰 予算管理（DB_Budget）');
+  sheet.getRange('G1').setFontSize(14).setFontWeight('bold').setFontColor('#27ae60');
+  sheet.getRange('G2').setValue('');
+  sheet.getRange('G3').setValue('【原則】');
+  sheet.getRange('G4').setValue('✅ UPSIDERと現金は月間予算で管理');
+  sheet.getRange('G5').setValue('✅ 銀行口座は実残高のみ記録');
+  sheet.getRange('G6').setValue('✅ 実残高はMFから週1回転記');
+  sheet.getRange('G7').setValue('');
+  sheet.getRange('G8').setValue('【運用ルール】');
+  sheet.getRange('G9').setValue('1. B列（月間予算）: UPSIDER・現金のみ入力');
+  sheet.getRange('G10').setValue('2. C列（実残高）: 全口座、MFから転記');
+  sheet.getRange('G11').setValue('3. メニューから「予算更新」実行');
+  sheet.getRange('G12').setValue('4. D列（残日数）・E列（1日使用可）自動計算');
+  sheet.getRange('G13').setValue('');
+  sheet.getRange('G14').setValue('【計算式】');
+  sheet.getRange('G15').setValue('残日数 = 月末日 - 今日 + 1');
+  sheet.getRange('G16').setValue('1日使用可能額 = 月間予算 ÷ 残日数');
+
+  sheet.setColumnWidth(7, 300); // G列
+
+  Logger.log('DB_Budget 作成完了');
 }
 
 /**
@@ -875,11 +1032,11 @@ function detectTransfers() {
 }
 
 /**
- * 全シート状態確認（v5.0）
+ * 全シート状態確認（v5.3）
  */
 function checkAllSheets() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const requiredSheets = ['Source_1', 'Source_2', 'Source_3', 'Source_4', 'Source_5', 'Source_6', 'DB_Transactions', 'DB_Master', 'Input_CashPlan', 'Calendar', 'Settings', 'Month_View'];
+  const requiredSheets = ['Source_1', 'Source_2', 'Source_3', 'Source_4', 'Source_5', 'Source_6', 'DB_Transactions', 'DB_Master', 'DB_Budget', 'Input_CashPlan', 'Calendar', 'Settings', 'Month_View'];
   const existingSheets = ss.getSheets().map(sheet => sheet.getName());
 
   let existCount = 0;
@@ -918,6 +1075,13 @@ function openMonthView() {
  */
 function openTransactions() {
   switchToSheet('DB_Transactions');
+}
+
+/**
+ * DB_Budgetシートを開く
+ */
+function openBudget() {
+  switchToSheet('DB_Budget');
 }
 
 /**
