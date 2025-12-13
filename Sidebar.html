@@ -175,18 +175,46 @@
       padding: 12px;
       margin-bottom: 10px;
       border-left: 4px solid #e67e22;
-      cursor: pointer;
       transition: all 0.3s;
     }
 
     .transaction-item:hover {
       background: #e4e7eb;
-      transform: translateX(5px);
     }
 
-    .transaction-item.selected {
-      background: #fff3e0;
-      border-left-color: #ff6d00;
+    .inline-register {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+      align-items: center;
+    }
+
+    .inline-register select {
+      flex: 1;
+      padding: 8px;
+      font-size: 12px;
+    }
+
+    .inline-register input {
+      flex: 1;
+      padding: 8px;
+      font-size: 12px;
+    }
+
+    .inline-register button {
+      padding: 8px 16px;
+      background: #0b5394;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .inline-register button:hover {
+      background: #1a73e8;
     }
 
     .transaction-date {
@@ -442,7 +470,18 @@
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // タブ1: 未分類バスター
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    let selectedTransaction = null;
+    let allCategories = [];
+
+    // ページ読み込み時に科目一覧を取得
+    function loadCategories() {
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            allCategories = result.categories;
+          }
+        })
+        .getAllCategories();
+    }
 
     function loadUncategorized() {
       google.script.run
@@ -455,26 +494,38 @@
           const countBadge = document.getElementById('uncategorized-count');
           const listDiv = document.getElementById('uncategorized-list');
 
-          if (result.totalCount === 0) {
+          if (result.count === 0) {
             listDiv.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">未分類取引はありません</p>';
             countBadge.style.display = 'none';
             return;
           }
 
-          countBadge.textContent = result.totalCount + '件 → ' + result.groupCount + 'パターン';
+          countBadge.textContent = result.count + '件';
           countBadge.style.display = 'inline-block';
 
+          // 科目ドロップダウンのオプション生成
+          const categoryOptions = allCategories.map(cat =>
+            `<option value="${escapeHtml(cat)}">${escapeHtml(cat)}</option>`
+          ).join('');
+
           let html = '';
-          result.data.forEach(group => {
-            const amountColor = group.totalAmount >= 0 ? '#2e7d32' : '#e67e22';
+          result.data.forEach((item, index) => {
+            const amountColor = item.amount >= 0 ? '#2e7d32' : '#e67e22';
+            const formattedDate = formatDate(item.date);
+
             html += `
-              <div class="transaction-item" onclick="selectGroupTransaction('${escapeHtml(group.description)}')">
-                <div class="transaction-date">
-                  <span style="background: #0b5394; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: bold;">${group.count}件</span>
-                  ${group.accounts}
+              <div class="transaction-item" id="item-${index}">
+                <div class="transaction-date">${formattedDate} | ${escapeHtml(item.account)}</div>
+                <div class="transaction-desc">${escapeHtml(item.description)}</div>
+                <div class="transaction-amount" style="color: ${amountColor};">¥${item.amount.toLocaleString()}</div>
+                <div class="inline-register">
+                  <select id="category-${index}">
+                    <option value="">科目を選択</option>
+                    ${categoryOptions}
+                  </select>
+                  <input type="text" id="tag-${index}" placeholder="タグ（任意）">
+                  <button onclick="registerInline(${index}, '${escapeHtml(item.description)}')">登録</button>
                 </div>
-                <div class="transaction-desc">${escapeHtml(group.description)}</div>
-                <div class="transaction-amount" style="color: ${amountColor};">合計: ¥${group.totalAmount.toLocaleString()}</div>
               </div>
             `;
           });
@@ -484,28 +535,37 @@
         .getUncategorizedTransactions();
     }
 
-    function selectGroupTransaction(description) {
-      selectedTransaction = null; // グループ選択なのでrowNumberは不要
-      document.getElementById('selected-description').value = description;
-      // キーワード入力欄に摘要を自動入力（編集可能）
-      document.getElementById('keyword-input').value = description;
+    function registerInline(index, description) {
+      const category = document.getElementById('category-' + index).value;
+      const tag = document.getElementById('tag-' + index).value;
 
-      // 選択状態を視覚化
-      document.querySelectorAll('.transaction-item').forEach(item => {
-        item.classList.remove('selected');
-      });
-      event.currentTarget.classList.add('selected');
-    }
+      if (!category) {
+        alert('科目を選択してください');
+        return;
+      }
 
-    function selectTransaction(rowNumber, description) {
-      selectedTransaction = rowNumber;
-      document.getElementById('selected-description').value = description;
+      // キーワードとして摘要をそのまま使用
+      const keyword = description;
 
-      // 選択状態を視覚化
-      document.querySelectorAll('.transaction-item').forEach(item => {
-        item.classList.remove('selected');
-      });
-      event.currentTarget.classList.add('selected');
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            alert('✅ ルールを登録しました！');
+            // 登録した項目をリストから削除（視覚的フィードバック）
+            const item = document.getElementById('item-' + index);
+            if (item) {
+              item.style.opacity = '0.3';
+              item.style.pointerEvents = 'none';
+            }
+            // 少し待ってから再読み込み
+            setTimeout(() => {
+              loadUncategorized();
+            }, 500);
+          } else {
+            alert('エラー: ' + result.message);
+          }
+        })
+        .registerKeywordRule(keyword, category, tag);
     }
 
     function previewKeyword() {
@@ -552,7 +612,7 @@
             alert('エラー: ' + result.message);
           }
         })
-        .registerKeywordRule(keyword, category, tag, 10);
+        .registerKeywordRule(keyword, category, tag);
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -667,11 +727,14 @@
       return `${year}-${month}-${day}`;
     }
 
-    // ページ読み込み時に今月をセット
+    // ページ読み込み時に今月をセットと科目一覧を取得
     document.addEventListener('DOMContentLoaded', function() {
       const today = new Date();
       const month = String(today.getMonth() + 1).padStart(2, '0');
       document.getElementById('review-month').value = `${today.getFullYear()}-${month}`;
+
+      // 科目一覧を取得
+      loadCategories();
     });
   </script>
 </body>

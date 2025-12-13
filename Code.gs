@@ -315,6 +315,7 @@ function refreshTransactions() {
 /**
  * DB_Master シート（脳みそ）
  * 自動仕訳のルールを管理
+ * v5.1: 優先度削除、判定カテゴリ→科目に統一
  */
 function setupDB_Master() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -329,8 +330,8 @@ function setupDB_Master() {
     return;
   }
 
-  // ヘッダー
-  const headers = ['検索キーワード', '判定カテゴリ', '詳細タグ', '優先度'];
+  // ヘッダー（優先度削除、判定カテゴリ→科目）
+  const headers = ['検索キーワード', '科目', '詳細タグ'];
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
 
   const headerRange = sheet.getRange(1, 1, 1, headers.length);
@@ -339,45 +340,44 @@ function setupDB_Master() {
   headerRange.setFontWeight('bold');
   headerRange.setHorizontalAlignment('center');
 
-  // サンプルデータ（ユーザーの例に準拠 + 優先度追加）
+  // サンプルデータ（優先度削除、科目統一）
   const sampleData = [
-    ['振込手数料', '支払手数料', '銀行手数料', 1],
-    ['UnivaPay', '売上', '決済入金', 1],
-    ['UPSIDER', '立替金', 'カード利用', 2],
-    ['GOOGLE', '広告宣伝費', 'Google広告', 1],
-    ['カ）オールエーアイ', '外注費', 'All AI', 1],
-    ['振込＊モカ', '役員報酬', '代表報酬', 1],
-    ['PayPay', '売上', 'PayPay決済', 1],
-    ['Amazon', '消耗品費', 'Amazon購入', 2],
-    ['さくら', '通信費', 'さくらサーバー', 1],
-    ['Adobe', '新聞図書費', 'Adobe CC', 1],
-    ['みずほ', '手数料', 'みずほ銀行', 3],
-    ['SBI', '手数料', 'SBI銀行', 3],
-    ['楽天', '手数料', '楽天銀行', 3],
-    ['Notion', '通信費', 'Notion利用料', 2],
-    ['GitHub', '通信費', 'GitHub利用料', 2],
-    ['AWS', '通信費', 'AWS利用料', 2]
+    ['振込手数料', '支払手数料', '銀行手数料'],
+    ['UnivaPay', '売上', '決済入金'],
+    ['UPSIDER', '立替金', 'カード利用'],
+    ['GOOGLE', '広告宣伝費', 'Google広告'],
+    ['カ）オールエーアイ', '外注費', 'All AI'],
+    ['振込＊モカ', '役員報酬', '代表報酬'],
+    ['PayPay', '売上', 'PayPay決済'],
+    ['Amazon', '消耗品費', 'Amazon購入'],
+    ['さくら', '通信費', 'さくらサーバー'],
+    ['Adobe', '通信費', 'Adobe CC'],
+    ['みずほ', '支払手数料', 'みずほ銀行'],
+    ['SBI', '支払手数料', 'SBI銀行'],
+    ['楽天', '支払手数料', '楽天銀行'],
+    ['Notion', '通信費', 'Notion利用料'],
+    ['GitHub', '通信費', 'GitHub利用料'],
+    ['AWS', '通信費', 'AWS利用料']
   ];
 
-  sheet.getRange(2, 1, sampleData.length, 4).setValues(sampleData);
+  sheet.getRange(2, 1, sampleData.length, 3).setValues(sampleData);
 
   // 列幅調整
   sheet.setColumnWidth(1, 200);
   sheet.setColumnWidth(2, 150);
   sheet.setColumnWidth(3, 200);
-  sheet.setColumnWidth(4, 80);
 
   // 使い方説明
   sheet.getRange('E1').setValue('🧠 自動仕訳の脳みそ');
   sheet.getRange('E1').setFontSize(14).setFontWeight('bold').setFontColor('#674ea7');
   sheet.getRange('E2').setValue('');
   sheet.getRange('E3').setValue('【仕組み】');
-  sheet.getRange('E4').setValue('DB_Integratedの「内容」列に');
+  sheet.getRange('E4').setValue('DB_Transactionsの「摘要」列に');
   sheet.getRange('E5').setValue('A列のキーワードが含まれるか検索');
   sheet.getRange('E6').setValue('→ 該当したらB列・C列を自動入力');
   sheet.getRange('E7').setValue('');
   sheet.getRange('E8').setValue('【運用ルール】');
-  sheet.getRange('E9').setValue('✅ 上の行ほど優先度が高い');
+  sheet.getRange('E9').setValue('✅ 上の行ほど優先（行順 = 優先度）');
   sheet.getRange('E10').setValue('✅ 部分一致で検索（前方一致不要）');
   sheet.getRange('E11').setValue('✅ 「未分類」が出たらここに追加');
   sheet.getRange('E12').setValue('✅ 追加した瞬間、自動で反映される');
@@ -387,7 +387,7 @@ function setupDB_Master() {
   // 列幅調整
   sheet.setColumnWidth(5, 280); // E列
 
-  Logger.log('DB_Master 作成完了（脳みそ）');
+  Logger.log('DB_Master 作成完了（脳みそ v5.1）');
 }
 
 /**
@@ -930,11 +930,10 @@ function resetTransactionsSheet() {
 /**
  * キーワードルールを登録
  * @param {string} keyword - 検索キーワード（正規表現可）
- * @param {string} category - 判定カテゴリ
+ * @param {string} category - 科目
  * @param {string} detail - 詳細タグ
- * @param {number} priority - 優先度（デフォルト: 10）
  */
-function registerKeywordRule(keyword, category, detail, priority = 10) {
+function registerKeywordRule(keyword, category, detail) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('DB_Master');
 
@@ -944,15 +943,8 @@ function registerKeywordRule(keyword, category, detail, priority = 10) {
   }
 
   try {
-    // 新しい行を追加
-    sheet.appendRow([keyword, category, detail, priority]);
-
-    // 優先度でソート（優先度列がある場合）
-    const lastRow = sheet.getLastRow();
-    if (lastRow > 1) {
-      const dataRange = sheet.getRange(2, 1, lastRow - 1, 4);
-      dataRange.sort([{column: 4, ascending: true}, {column: 1, ascending: true}]);
-    }
+    // 新しい行を最後に追加（行順 = 優先度）
+    sheet.appendRow([keyword, category, detail]);
 
     showToast('✅ 登録完了！', `キーワード「${keyword}」を追加しました`, 3);
     Logger.log(`キーワードルール登録: ${keyword} → ${category}`);
@@ -1059,8 +1051,44 @@ function getSelectedDescription() {
 }
 
 /**
- * 未分類一覧を取得（グルーピング版）
+ * DB_Masterから科目一覧を取得
+ * v5.1: 未分類取引のドロップダウン表示用
+ */
+function getAllCategories() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('DB_Master');
+
+  if (!sheet) {
+    return { success: false, categories: [] };
+  }
+
+  try {
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      return { success: true, categories: [] };
+    }
+
+    // B列（科目）のデータを取得
+    const categoryRange = sheet.getRange(2, 2, lastRow - 1, 1);
+    const categories = categoryRange.getValues()
+      .map(row => row[0])
+      .filter(cat => cat !== '') // 空白除外
+      .filter((cat, index, self) => self.indexOf(cat) === index); // 重複除外
+
+    return {
+      success: true,
+      categories: categories.sort() // アルファベット順ソート
+    };
+  } catch (error) {
+    Logger.log('科目一覧取得エラー: ' + error);
+    return { success: false, categories: [] };
+  }
+}
+
+/**
+ * 未分類一覧を取得（個別表示版）
  * サイドバーの「未分類バスター」タブ用
+ * v5.1: グルーピングせず、1件ずつ表示
  */
 function getUncategorizedTransactions() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1080,7 +1108,7 @@ function getUncategorizedTransactions() {
     const dataRange = sheet.getRange(2, 1, lastRow - 1, 8);
     const values = dataRange.getValues();
 
-    // 科目が「未分類」の行のみフィルタ
+    // 科目が「未分類」の行のみフィルタ（グルーピングなし、1件ずつ）
     const uncategorized = values
       .map((row, index) => ({
         rowNumber: index + 2,
@@ -1095,43 +1123,11 @@ function getUncategorizedTransactions() {
       }))
       .filter(item => item.category === '未分類');
 
-    // 摘要でグルーピング
-    const grouped = {};
-    uncategorized.forEach(item => {
-      const key = item.description;
-      if (!grouped[key]) {
-        grouped[key] = {
-          description: key,
-          count: 0,
-          totalAmount: 0,
-          accounts: new Set(),
-          firstDate: item.date,
-          sample: item
-        };
-      }
-      grouped[key].count++;
-      grouped[key].totalAmount += item.amount;
-      grouped[key].accounts.add(item.account);
-    });
-
-    // 配列に変換して件数順にソート
-    const groupedArray = Object.values(grouped)
-      .map(g => ({
-        description: g.description,
-        count: g.count,
-        totalAmount: g.totalAmount,
-        accounts: Array.from(g.accounts).join(', '),
-        firstDate: g.firstDate,
-        sample: g.sample
-      }))
-      .sort((a, b) => b.count - a.count); // 件数が多い順
-
     return {
       success: true,
-      data: groupedArray,
-      totalCount: uncategorized.length,
-      groupCount: groupedArray.length,
-      message: `${uncategorized.length}件の未分類取引が${groupedArray.length}パターンにグルーピングされました`
+      data: uncategorized,
+      count: uncategorized.length,
+      message: `${uncategorized.length}件の未分類取引`
     };
   } catch (error) {
     Logger.log('未分類取得エラー: ' + error);
