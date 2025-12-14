@@ -1070,35 +1070,40 @@ function setupCF_Snapshots() {
   sheet.getRange('A1').setValue('💰 週1残高入力（6口座）');
   sheet.getRange('A1').setFontSize(14).setFontWeight('bold').setFontColor('#0b5394');
 
-  // ヘッダー行（A3:H3）
-  const snapshotHeaders = ['入力日', 'Source_1', 'Source_2', 'Source_3', 'Source_4', 'Source_5', 'Source_6', 'メモ'];
-  sheet.getRange(3, 1, 1, 8).setValues([snapshotHeaders]);
+  // ヘッダー行（A3:I3）- B列に合計を追加
+  const snapshotHeaders = ['入力日', '合計', 'Source_1', 'Source_2', 'Source_3', 'Source_4', 'Source_5', 'Source_6', 'メモ'];
+  sheet.getRange(3, 1, 1, 9).setValues([snapshotHeaders]);
 
-  const snapshotHeaderRange = sheet.getRange(3, 1, 1, 8);
+  const snapshotHeaderRange = sheet.getRange(3, 1, 1, 9);
   snapshotHeaderRange.setBackground('#34a853');
   snapshotHeaderRange.setFontColor('#FFFFFF');
   snapshotHeaderRange.setFontWeight('bold');
   snapshotHeaderRange.setHorizontalAlignment('center');
 
-  // B〜G列のヘッダは Source_1〜6!K1 を参照（口座名を自動表示）
+  // C〜H列のヘッダは Source_1〜6!K1 を参照（口座名を自動表示）
   for (let i = 1; i <= 6; i++) {
-    sheet.getRange(3, i + 1).setFormula(`=IFERROR(Source_${i}!K1, "Source_${i}")`);
+    sheet.getRange(3, i + 2).setFormula(`=IFERROR(Source_${i}!K1, "Source_${i}")`);
   }
 
   // サンプルデータ（1行）
   const sampleSnapshot = [
-    [new Date(), 1200000, 800000, 500000, 0, 0, 0, '初期残高']
+    [new Date(), '', 1200000, 800000, 500000, 0, 0, 0, '初期残高']
   ];
-  sheet.getRange(4, 1, 1, 8).setValues(sampleSnapshot);
+  sheet.getRange(4, 1, 1, 9).setValues(sampleSnapshot);
   sheet.getRange('A4').setNumberFormat('yyyy/mm/dd');
-  sheet.getRange('B4:G4').setNumberFormat('#,##0');
+
+  // B列: ARRAYFORMULAで合計を自動計算（A列に日付があれば C〜H列を合計）
+  sheet.getRange('B4').setFormula('=ARRAYFORMULA(IF(A4:A="", "", C4:C+D4:D+E4:E+F4:F+G4:G+H4:H))');
+  sheet.getRange('B:B').setNumberFormat('#,##0');
+  sheet.getRange('C4:H4').setNumberFormat('#,##0');
 
   // 列幅調整
-  sheet.setColumnWidth(1, 100); // A列：入力日
-  for (let i = 2; i <= 7; i++) {
-    sheet.setColumnWidth(i, 100); // B〜G列：残高
+  sheet.setColumnWidth(1, 100);  // A列：入力日
+  sheet.setColumnWidth(2, 120);  // B列：合計
+  for (let i = 3; i <= 8; i++) {
+    sheet.setColumnWidth(i, 100); // C〜H列：Source_1〜6残高
   }
-  sheet.setColumnWidth(8, 150); // H列：メモ
+  sheet.setColumnWidth(9, 150);  // I列：メモ
 
   Logger.log('CF_Snapshots シート作成完了');
 }
