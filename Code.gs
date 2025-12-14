@@ -58,14 +58,14 @@ function initializeDatabase() {
     setupDB_Budget();        // 予算管理（UPSIDER・現金）
     setupInput_CashPlan();   // 予定取引
     setupCF_Snapshots();     // CF_Snapshots（週1残高入力）
-    setupCF();               // CF表（資金予実・日次）
+    // setupCF();            // CF表（資金予実・日次）※別途手動で設定
 
     showToast('✅ 初期化完了！', 'Cash Flow管理システムが稼働しました', 5);
 
     return {
       success: true,
       message: '初期化完了',
-      sheets: ['Source_1-6', 'DB_Transactions', 'DB_Master', 'DB_Budget', 'Input_CashPlan', 'CF_Snapshots', 'CF']
+      sheets: ['Source_1-6', 'DB_Transactions', 'DB_Master', 'DB_Budget', 'Input_CashPlan', 'CF_Snapshots']
     };
   } catch (error) {
     showToast('❌ エラー', error.message, 10);
@@ -733,7 +733,7 @@ function detectTransfers() {
  */
 function checkAllSheets() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const requiredSheets = ['Source_1', 'Source_2', 'Source_3', 'Source_4', 'Source_5', 'Source_6', 'DB_Transactions', 'DB_Master', 'DB_Budget', 'Input_CashPlan', 'CF_Snapshots', 'CF'];
+  const requiredSheets = ['Source_1', 'Source_2', 'Source_3', 'Source_4', 'Source_5', 'Source_6', 'DB_Transactions', 'DB_Master', 'DB_Budget', 'Input_CashPlan', 'CF_Snapshots'];
   const existingSheets = ss.getSheets().map(sheet => sheet.getName());
 
   let existCount = 0;
