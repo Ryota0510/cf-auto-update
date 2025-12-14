@@ -55,7 +55,7 @@ function initializeDatabase() {
     // 新アーキテクチャのシート群
     setupDB_Transactions();  // 資金台帳（旧DB_Integrated）
     setupDB_Master();        // キーワードルール
-    setupDB_Budget();        // 予算管理（UPSIDER・現金）
+    // setupDB_Budget();     // 予算管理（削除：B案では不使用）
     setupInput_CashPlan();   // 予定取引
     setupCF_Snapshots();     // CF_Snapshots（週1残高入力）
     // setupCF();            // CF表（資金予実・日次）※別途手動で設定
@@ -65,7 +65,7 @@ function initializeDatabase() {
     return {
       success: true,
       message: '初期化完了',
-      sheets: ['Source_1-6', 'DB_Transactions', 'DB_Master', 'DB_Budget', 'Input_CashPlan', 'CF_Snapshots']
+      sheets: ['Source_1-6', 'DB_Transactions', 'DB_Master', 'Input_CashPlan', 'CF_Snapshots']
     };
   } catch (error) {
     showToast('❌ エラー', error.message, 10);
@@ -611,8 +611,8 @@ function setupInput_CashPlan() {
     return;
   }
 
-  // ヘッダー
-  const headers = ['予定日', '口座', '科目', '予定金額', '繰り返し', 'ステータス', 'メモ'];
+  // ヘッダー（5列に簡素化）
+  const headers = ['予定日', '科目', '予定金額', '種別', 'メモ'];
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
 
   const headerRange = sheet.getRange(1, 1, 1, headers.length);
@@ -621,38 +621,56 @@ function setupInput_CashPlan() {
   headerRange.setFontWeight('bold');
   headerRange.setHorizontalAlignment('center');
 
-  // サンプルデータ
+  // サンプルデータ（月次枠と単発の例）
   const sampleData = [
-    [new Date(2025, 0, 25), 'みずほ銀行', '家賃', -200000, '毎月25日', '予定', ''],
-    [new Date(2025, 0, 31), 'みずほ銀行', '人件費', -300000, '毎月末日', '予定', ''],
-    [new Date(2025, 1, 10), 'UPSIDER', '広告宣伝費', -150000, '', '予定', '代表枠'],
-    [new Date(2025, 1, 15), 'みずほ銀行', '売上', 500000, '', '予定', '']
+    [new Date(2025, 0, 1), 'UPSIDER枠', 500000, '月次枠', '月間予算'],
+    [new Date(2025, 0, 1), '現金経費', 300000, '月次枠', '月間予算'],
+    [new Date(2025, 0, 25), '家賃', 200000, '単発', ''],
+    [new Date(2025, 0, 31), '人件費', 300000, '単発', '給与振込']
   ];
 
-  sheet.getRange(2, 1, sampleData.length, 7).setValues(sampleData);
+  sheet.getRange(2, 1, sampleData.length, 5).setValues(sampleData);
+  sheet.getRange('A2:A').setNumberFormat('yyyy/mm/dd');
+  sheet.getRange('C2:C').setNumberFormat('#,##0');
+
+  // B列（科目）：CF_Snapshots!K4:K からドロップダウン
+  const categoryRule = SpreadsheetApp.newDataValidation()
+    .requireValueInRange(ss.getRange('CF_Snapshots!K4:K'), true)
+    .setAllowInvalid(false)
+    .setHelpText('科目一覧から選択してください')
+    .build();
+  sheet.getRange('B2:B').setDataValidation(categoryRule);
+
+  // D列（種別）：単発 or 月次枠 のみ
+  const typeRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['単発', '月次枠'], true)
+    .setAllowInvalid(false)
+    .setHelpText('「単発」または「月次枠」を選択')
+    .build();
+  sheet.getRange('D2:D').setDataValidation(typeRule);
 
   // 列幅調整
   sheet.setColumnWidth(1, 100);  // 予定日
-  sheet.setColumnWidth(2, 150);  // 口座
-  sheet.setColumnWidth(3, 150);  // 科目
-  sheet.setColumnWidth(4, 120);  // 予定金額
-  sheet.setColumnWidth(5, 100);  // 繰り返し
-  sheet.setColumnWidth(6, 80);   // ステータス
-  sheet.setColumnWidth(7, 200);  // メモ
+  sheet.setColumnWidth(2, 150);  // 科目
+  sheet.setColumnWidth(3, 120);  // 予定金額
+  sheet.setColumnWidth(4, 100);  // 種別
+  sheet.setColumnWidth(5, 200);  // メモ
 
   // 説明欄
   sheet.getRange('J1').setValue('📅 予定取引（Input_CashPlan）');
   sheet.getRange('J1').setFontSize(14).setFontWeight('bold').setFontColor('#e67e22');
   sheet.getRange('J2').setValue('');
-  sheet.getRange('J3').setValue('【原則】');
-  sheet.getRange('J4').setValue('✅ 未来の予定される資金移動のみ');
-  sheet.getRange('J5').setValue('✅ 家賃/人件費/代表枠/UPSIDER枠など');
-  sheet.getRange('J6').setValue('');
-  sheet.getRange('J7').setValue('【使い方】');
-  sheet.getRange('J8').setValue('このシートに直接入力して予定を追加');
-  sheet.getRange('J9').setValue('繰り返し項目は「繰り返し」列に記入');
+  sheet.getRange('J3').setValue('【種別：月次枠】');
+  sheet.getRange('J4').setValue('・予定日=その月の1日（例：2025/11/01）');
+  sheet.getRange('J5').setValue('・予定金額=月間予算（正数）');
+  sheet.getRange('J6').setValue('・科目=枠の科目（UPSIDER枠、現金経費など）');
+  sheet.getRange('J7').setValue('→ CF表で日割り展開され、端数は月末に寄せられます');
+  sheet.getRange('J8').setValue('');
+  sheet.getRange('J9').setValue('【種別：単発】');
+  sheet.getRange('J10').setValue('・特定日の支出/入金（家賃、人件費など）');
+  sheet.getRange('J11').setValue('・予定金額は正数=出金、負数=入金');
 
-  sheet.setColumnWidth(10, 280); // J列
+  sheet.setColumnWidth(10, 320); // J列
 
   Logger.log('Input_CashPlan 作成完了');
 }
@@ -733,7 +751,7 @@ function detectTransfers() {
  */
 function checkAllSheets() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const requiredSheets = ['Source_1', 'Source_2', 'Source_3', 'Source_4', 'Source_5', 'Source_6', 'DB_Transactions', 'DB_Master', 'DB_Budget', 'Input_CashPlan', 'CF_Snapshots'];
+  const requiredSheets = ['Source_1', 'Source_2', 'Source_3', 'Source_4', 'Source_5', 'Source_6', 'DB_Transactions', 'DB_Master', 'Input_CashPlan', 'CF_Snapshots'];
   const existingSheets = ss.getSheets().map(sheet => sheet.getName());
 
   let existCount = 0;
@@ -1097,12 +1115,12 @@ function setupCF_Snapshots() {
   sheet.getRange('B:B').setNumberFormat('#,##0');
   sheet.getRange('C4:H4').setNumberFormat('#,##0');
 
-  // K列：科目一覧（DB_Budget, DB_Master, Input_CashPlanから統合）
+  // K列：科目一覧（DB_Master, Input_CashPlanから統合）
   sheet.getRange('K3').setValue('科目一覧');
   sheet.getRange('K3').setFontWeight('bold').setBackground('#34a853').setFontColor('#FFFFFF').setHorizontalAlignment('center');
 
-  // K4: 全シートから科目を取得してソート・ユニーク化
-  const categoryFormula = '=SORT(UNIQUE(FILTER({DB_Budget!A2:A; DB_Master!B2:B; Input_CashPlan!C2:C}, {DB_Budget!A2:A; DB_Master!B2:B; Input_CashPlan!C2:C}<>"" )))';
+  // K4: 全シートから科目を取得してソート・ユニーク化（DB_MasterとInput_CashPlanのみ）
+  const categoryFormula = '=SORT(UNIQUE(FILTER({DB_Master!B2:B; Input_CashPlan!B2:B}, {DB_Master!B2:B; Input_CashPlan!B2:B}<>"" )))';
   sheet.getRange('K4').setFormula(categoryFormula);
 
   // 列幅調整
