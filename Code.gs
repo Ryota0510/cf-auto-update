@@ -17,6 +17,7 @@ function onOpen() {
     .addSeparator()
     .addSubMenu(ui.createMenu('📊 表示切替')
       .addItem('CF表を開く', 'openCF')
+      .addItem('CF_Snapshots（残高入力）を開く', 'openCF_Snapshots')
       .addItem('DB_Transactionsを開く', 'openTransactions')
       .addItem('DB_Budgetを開く', 'openBudget'))
     .addSeparator()
@@ -56,6 +57,7 @@ function initializeDatabase() {
     setupDB_Master();        // キーワードルール
     setupDB_Budget();        // 予算管理（UPSIDER・現金）
     setupInput_CashPlan();   // 予定取引
+    setupCF_Snapshots();     // CF_Snapshots（週1残高入力）
     setupCF();               // CF表（資金予実・日次）
 
     showToast('✅ 初期化完了！', 'Cash Flow管理システムが稼働しました', 5);
@@ -63,7 +65,7 @@ function initializeDatabase() {
     return {
       success: true,
       message: '初期化完了',
-      sheets: ['Source_1-6', 'DB_Transactions', 'DB_Master', 'DB_Budget', 'Input_CashPlan', 'CF']
+      sheets: ['Source_1-6', 'DB_Transactions', 'DB_Master', 'DB_Budget', 'Input_CashPlan', 'CF_Snapshots', 'CF']
     };
   } catch (error) {
     showToast('❌ エラー', error.message, 10);
@@ -731,7 +733,7 @@ function detectTransfers() {
  */
 function checkAllSheets() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const requiredSheets = ['Source_1', 'Source_2', 'Source_3', 'Source_4', 'Source_5', 'Source_6', 'DB_Transactions', 'DB_Master', 'DB_Budget', 'Input_CashPlan', 'CF'];
+  const requiredSheets = ['Source_1', 'Source_2', 'Source_3', 'Source_4', 'Source_5', 'Source_6', 'DB_Transactions', 'DB_Master', 'DB_Budget', 'Input_CashPlan', 'CF_Snapshots', 'CF'];
   const existingSheets = ss.getSheets().map(sheet => sheet.getName());
 
   let existCount = 0;
@@ -777,6 +779,13 @@ function openBudget() {
  */
 function openCF() {
   switchToSheet('CF');
+}
+
+/**
+ * CF_Snapshotsを開く
+ */
+function openCF_Snapshots() {
+  switchToSheet('CF_Snapshots');
 }
 
 /**
@@ -1040,8 +1049,63 @@ function getAllCategories() {
 }
 
 /**
- * CF表（資金予実・日次）シート作成 - v2.0
- * 確定仕様：合計残高のみ、Helper集計→View参照
+ * CF_Snapshots シート作成（週1残高入力専用）
+ */
+function setupCF_Snapshots() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName('CF_Snapshots');
+
+  if (!sheet) {
+    sheet = ss.insertSheet('CF_Snapshots');
+  }
+
+  // 既に設定済みの場合はスキップ
+  if (sheet.getRange('A1').getValue() === '💰 週1残高入力') {
+    Logger.log('CF_Snapshots は既に設定済み');
+    return;
+  }
+
+  sheet.clear();
+
+  sheet.getRange('A1').setValue('💰 週1残高入力（6口座）');
+  sheet.getRange('A1').setFontSize(14).setFontWeight('bold').setFontColor('#0b5394');
+
+  // ヘッダー行（A3:H3）
+  const snapshotHeaders = ['入力日', 'Source_1', 'Source_2', 'Source_3', 'Source_4', 'Source_5', 'Source_6', 'メモ'];
+  sheet.getRange(3, 1, 1, 8).setValues([snapshotHeaders]);
+
+  const snapshotHeaderRange = sheet.getRange(3, 1, 1, 8);
+  snapshotHeaderRange.setBackground('#34a853');
+  snapshotHeaderRange.setFontColor('#FFFFFF');
+  snapshotHeaderRange.setFontWeight('bold');
+  snapshotHeaderRange.setHorizontalAlignment('center');
+
+  // B〜G列のヘッダは Source_1〜6!K1 を参照（口座名を自動表示）
+  for (let i = 1; i <= 6; i++) {
+    sheet.getRange(3, i + 1).setFormula(`=IFERROR(Source_${i}!K1, "Source_${i}")`);
+  }
+
+  // サンプルデータ（1行）
+  const sampleSnapshot = [
+    [new Date(), 1200000, 800000, 500000, 0, 0, 0, '初期残高']
+  ];
+  sheet.getRange(4, 1, 1, 8).setValues(sampleSnapshot);
+  sheet.getRange('A4').setNumberFormat('yyyy/mm/dd');
+  sheet.getRange('B4:G4').setNumberFormat('#,##0');
+
+  // 列幅調整
+  sheet.setColumnWidth(1, 100); // A列：入力日
+  for (let i = 2; i <= 7; i++) {
+    sheet.setColumnWidth(i, 100); // B〜G列：残高
+  }
+  sheet.setColumnWidth(8, 150); // H列：メモ
+
+  Logger.log('CF_Snapshots シート作成完了');
+}
+
+/**
+ * CF表（資金予実・日次）シート作成 - v3.0
+ * Snapshotsは別シート、CFはControls + View + Helperのみ
  */
 function setupCF() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1049,6 +1113,12 @@ function setupCF() {
 
   if (!sheet) {
     sheet = ss.insertSheet('CF');
+  }
+
+  // 既に設定済みの場合はスキップ
+  if (sheet.getRange('A1').getValue() === '📊 CF表（資金予実・日次）') {
+    Logger.log('CF は既に設定済み');
+    return;
   }
 
   // 既存のCFシートをクリア（作り直し）
@@ -1078,43 +1148,7 @@ function setupCF() {
   sheet.getRange('B3').setBackground('#fff3e0');
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // 2. Snapshots領域（週1残高手入力）
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  sheet.getRange('A5').setValue('💰 週1残高入力（6口座）');
-  sheet.getRange('A5').setFontSize(14).setFontWeight('bold').setFontColor('#0b5394');
-
-  // ヘッダー行（A6:H6）
-  const snapshotHeaders = ['入力日', 'Source_1', 'Source_2', 'Source_3', 'Source_4', 'Source_5', 'Source_6', 'メモ'];
-  sheet.getRange(6, 1, 1, 8).setValues([snapshotHeaders]);
-
-  const snapshotHeaderRange = sheet.getRange(6, 1, 1, 8);
-  snapshotHeaderRange.setBackground('#34a853');
-  snapshotHeaderRange.setFontColor('#FFFFFF');
-  snapshotHeaderRange.setFontWeight('bold');
-  snapshotHeaderRange.setHorizontalAlignment('center');
-
-  // B〜G列のヘッダは Source_1〜6!K1 を参照（口座名を自動表示）
-  for (let i = 1; i <= 6; i++) {
-    sheet.getRange(6, i + 1).setFormula(`=IFERROR(Source_${i}!K1, "Source_${i}")`);
-  }
-
-  // サンプルデータ（1行）
-  const sampleSnapshot = [
-    [new Date(), 1200000, 800000, 500000, 0, 0, 0, '初期残高']
-  ];
-  sheet.getRange(7, 1, 1, 8).setValues(sampleSnapshot);
-  sheet.getRange('A7').setNumberFormat('yyyy/mm/dd');
-  sheet.getRange('B7:G7').setNumberFormat('#,##0');
-
-  // 列幅調整
-  sheet.setColumnWidth(1, 100); // A列：入力日
-  for (let i = 2; i <= 7; i++) {
-    sheet.setColumnWidth(i, 100); // B〜G列：残高
-  }
-  sheet.setColumnWidth(8, 150); // H列：メモ
-
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // 3. Helper領域（AM列以降、非表示で集計）
+  // 2. Helper領域（AM列以降、非表示で集計）
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   const HC = 39; // AM列 = Helper開始列
 
@@ -1152,28 +1186,27 @@ function setupCF() {
   }
 
   // SnapshotTotal（各スナップショット行の合計残高）
+  // CF_SnapshotsのA4から参照
   sheet.getRange(6, HC).setValue('SnapshotTotal');
-  // A列にスナップショット日付がある行について、B〜G列の合計を計算
-  // A7から下に向かって、A列が日付ならその行のB〜Gを合計
-  // これは後でView領域から参照する用
-  sheet.getRange(6, HC + 1).setFormula('=IF(A7<>"", SUM(B7:G7), "")');
+  sheet.getRange(6, HC + 1).setFormula('=IF(CF_Snapshots!A4<>"", SUM(CF_Snapshots!B4:G4), "")');
 
   // MonthStartBalance（月初残高、アンカー方式）
-  // 簡易版：表示月の最も近いスナップショットの合計を使用
+  // 簡易版：CF_Snapshotsの最初の行の合計を使用
   // TODO: 後でアンカー方式を完全実装
   sheet.getRange(7, HC).setValue('MonthStartBalance');
-  sheet.getRange(7, HC + 1).setValue('=IF(A7<>"", SUM(B7:G7), 0)');
+  sheet.getRange(7, HC + 1).setValue('=IF(CF_Snapshots!A4<>"", SUM(CF_Snapshots!B4:G4), 0)');
 
   // Helper列を非表示（AM列以降）
   sheet.hideColumns(HC, 40); // AM〜BZ列を非表示
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // 4. View領域（A30から：目視CF表）
+  // 3. View領域（A5から：目視CF表）
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  const VR = 30; // View開始行
+  const VR = 6; // View開始行（日付ヘッダー）
 
-  sheet.getRange(VR - 1, 1).setValue('📊 CF表（合計残高のみ）');
-  sheet.getRange(VR - 1, 1).setFontSize(14).setFontWeight('bold').setFontColor('#0b5394');
+  // View見出し（A5）
+  sheet.getRange(5, 1).setValue('📊 CF表（合計残高のみ）');
+  sheet.getRange(5, 1).setFontSize(14).setFontWeight('bold').setFontColor('#0b5394');
 
   // 日付ヘッダー行（B30〜AF30：1〜31日）
   sheet.getRange(VR, 1).setValue('項目');
