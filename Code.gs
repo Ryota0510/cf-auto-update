@@ -16,13 +16,14 @@ function onOpen() {
       .addItem('DB_Transactions再構築', 'resetTransactionsSheet'))
     .addSeparator()
     .addSubMenu(ui.createMenu('📊 表示切替')
+      .addItem('CF表を開く', 'openCF')
       .addItem('DB_Transactionsを開く', 'openTransactions')
       .addItem('DB_Budgetを開く', 'openBudget'))
     .addSeparator()
     .addItem('📋 全シート状態確認', 'checkAllSheets')
     .addToUi();
 
-  showToast('💰 CF自動更新 v5.3', 'Cash Flow管理 稼働中', 5);
+  showToast('💰 CF自動更新 v5.4', 'Cash Flow管理 稼働中', 5);
 }
 
 /**
@@ -55,13 +56,14 @@ function initializeDatabase() {
     setupDB_Master();        // キーワードルール
     setupDB_Budget();        // 予算管理（UPSIDER・現金）
     setupInput_CashPlan();   // 予定取引
+    setupCF();               // CF表（資金予実・日次）
 
     showToast('✅ 初期化完了！', 'Cash Flow管理システムが稼働しました', 5);
 
     return {
       success: true,
       message: '初期化完了',
-      sheets: ['Source_1-6', 'DB_Transactions', 'DB_Master', 'DB_Budget', 'Input_CashPlan']
+      sheets: ['Source_1-6', 'DB_Transactions', 'DB_Master', 'DB_Budget', 'Input_CashPlan', 'CF']
     };
   } catch (error) {
     showToast('❌ エラー', error.message, 10);
@@ -725,11 +727,11 @@ function detectTransfers() {
 }
 
 /**
- * 全シート状態確認（v5.3）
+ * 全シート状態確認（v5.4）
  */
 function checkAllSheets() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const requiredSheets = ['Source_1', 'Source_2', 'Source_3', 'Source_4', 'Source_5', 'Source_6', 'DB_Transactions', 'DB_Master', 'DB_Budget', 'Input_CashPlan'];
+  const requiredSheets = ['Source_1', 'Source_2', 'Source_3', 'Source_4', 'Source_5', 'Source_6', 'DB_Transactions', 'DB_Master', 'DB_Budget', 'Input_CashPlan', 'CF'];
   const existingSheets = ss.getSheets().map(sheet => sheet.getName());
 
   let existCount = 0;
@@ -768,6 +770,13 @@ function openTransactions() {
  */
 function openBudget() {
   switchToSheet('DB_Budget');
+}
+
+/**
+ * CF表を開く
+ */
+function openCF() {
+  switchToSheet('CF');
 }
 
 /**
@@ -1028,4 +1037,265 @@ function getAllCategories() {
     Logger.log('科目一覧取得エラー: ' + error);
     return { success: false, categories: [] };
   }
+}
+
+/**
+ * CF表（資金予実・日次）シート作成 - v2.0
+ * 確定仕様：合計残高のみ、Helper集計→View参照
+ */
+function setupCF() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName('CF');
+
+  if (!sheet) {
+    sheet = ss.insertSheet('CF');
+  }
+
+  // 既存のCFシートをクリア（作り直し）
+  sheet.clear();
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 1. Controls領域（表示月などの入力）
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  sheet.getRange('A1').setValue('📊 CF表（資金予実・日次）');
+  sheet.getRange('A1').setFontSize(16).setFontWeight('bold').setFontColor('#0b5394');
+
+  sheet.getRange('A2').setValue('表示月:');
+  sheet.getRange('A2').setFontWeight('bold');
+
+  // B2: 表示月（今月をデフォルト、日付型）
+  const today = new Date();
+  const defaultMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  sheet.getRange('B2').setValue(defaultMonth);
+  sheet.getRange('B2').setNumberFormat('yyyy/mm/dd');
+  sheet.getRange('B2').setBackground('#fff3e0');
+
+  sheet.getRange('A3').setValue('予定を含める:');
+  sheet.getRange('A3').setFontWeight('bold');
+
+  // B3: 予定を予測残高に含めるか（TRUE/FALSE）
+  sheet.getRange('B3').setValue(true);
+  sheet.getRange('B3').setBackground('#fff3e0');
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 2. Snapshots領域（週1残高手入力）
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  sheet.getRange('A5').setValue('💰 週1残高入力（6口座）');
+  sheet.getRange('A5').setFontSize(14).setFontWeight('bold').setFontColor('#0b5394');
+
+  // ヘッダー行（A6:H6）
+  const snapshotHeaders = ['入力日', 'Source_1', 'Source_2', 'Source_3', 'Source_4', 'Source_5', 'Source_6', 'メモ'];
+  sheet.getRange(6, 1, 1, 8).setValues([snapshotHeaders]);
+
+  const snapshotHeaderRange = sheet.getRange(6, 1, 1, 8);
+  snapshotHeaderRange.setBackground('#34a853');
+  snapshotHeaderRange.setFontColor('#FFFFFF');
+  snapshotHeaderRange.setFontWeight('bold');
+  snapshotHeaderRange.setHorizontalAlignment('center');
+
+  // B〜G列のヘッダは Source_1〜6!K1 を参照（口座名を自動表示）
+  for (let i = 1; i <= 6; i++) {
+    sheet.getRange(6, i + 1).setFormula(`=IFERROR(Source_${i}!K1, "Source_${i}")`);
+  }
+
+  // サンプルデータ（1行）
+  const sampleSnapshot = [
+    [new Date(), 1200000, 800000, 500000, 0, 0, 0, '初期残高']
+  ];
+  sheet.getRange(7, 1, 1, 8).setValues(sampleSnapshot);
+  sheet.getRange('A7').setNumberFormat('yyyy/mm/dd');
+  sheet.getRange('B7:G7').setNumberFormat('#,##0');
+
+  // 列幅調整
+  sheet.setColumnWidth(1, 100); // A列：入力日
+  for (let i = 2; i <= 7; i++) {
+    sheet.setColumnWidth(i, 100); // B〜G列：残高
+  }
+  sheet.setColumnWidth(8, 150); // H列：メモ
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 3. Helper領域（AM列以降、非表示で集計）
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  const HC = 39; // AM列 = Helper開始列
+
+  sheet.getRange(1, HC).setValue('Helper領域（集計用・非表示）');
+  sheet.getRange(1, HC).setFontSize(12).setFontWeight('bold').setFontColor('#999999');
+
+  // 日付配列（1〜31日）を横に並べる
+  sheet.getRange(2, HC).setValue('日');
+  for (let d = 1; d <= 31; d++) {
+    sheet.getRange(2, HC + d).setValue(d);
+  }
+
+  // ActualNet（日別実績増減）- 表示月で絞る
+  sheet.getRange(3, HC).setValue('ActualNet');
+  for (let d = 1; d <= 31; d++) {
+    // 表示月の d日 の DB_Transactions!D列（金額）を合計
+    const formula = `=SUMIFS(DB_Transactions!D:D, DB_Transactions!A:A, DATE(YEAR($B$2), MONTH($B$2), ${d}))`;
+    sheet.getRange(3, HC + d).setFormula(formula);
+  }
+
+  // PlanNet（日別予定増減）- 表示月で絞る + B3で切替
+  sheet.getRange(4, HC).setValue('PlanNet');
+  for (let d = 1; d <= 31; d++) {
+    // 表示月の d日 の Input_CashPlan!D列（予定金額）を合計、B3がTRUEの時のみ
+    const formula = `=IF($B$3, SUMIFS(Input_CashPlan!D:D, Input_CashPlan!A:A, DATE(YEAR($B$2), MONTH($B$2), ${d})), 0)`;
+    sheet.getRange(4, HC + d).setFormula(formula);
+  }
+
+  // HasActual（実績があるか）
+  sheet.getRange(5, HC).setValue('HasActual');
+  for (let d = 1; d <= 31; d++) {
+    const col = HC + d;
+    const colLetter = columnToLetter(col);
+    sheet.getRange(5, col).setFormula(`=${colLetter}3<>0`);
+  }
+
+  // SnapshotTotal（各スナップショット行の合計残高）
+  sheet.getRange(6, HC).setValue('SnapshotTotal');
+  // A列にスナップショット日付がある行について、B〜G列の合計を計算
+  // A7から下に向かって、A列が日付ならその行のB〜Gを合計
+  // これは後でView領域から参照する用
+  sheet.getRange(6, HC + 1).setFormula('=IF(A7<>"", SUM(B7:G7), "")');
+
+  // MonthStartBalance（月初残高、アンカー方式）
+  // 簡易版：表示月の最も近いスナップショットの合計を使用
+  // TODO: 後でアンカー方式を完全実装
+  sheet.getRange(7, HC).setValue('MonthStartBalance');
+  sheet.getRange(7, HC + 1).setValue('=IF(A7<>"", SUM(B7:G7), 0)');
+
+  // Helper列を非表示（AM列以降）
+  sheet.hideColumns(HC, 40); // AM〜BZ列を非表示
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 4. View領域（A30から：目視CF表）
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  const VR = 30; // View開始行
+
+  sheet.getRange(VR - 1, 1).setValue('📊 CF表（合計残高のみ）');
+  sheet.getRange(VR - 1, 1).setFontSize(14).setFontWeight('bold').setFontColor('#0b5394');
+
+  // 日付ヘッダー行（B30〜AF30：1〜31日）
+  sheet.getRange(VR, 1).setValue('項目');
+  sheet.getRange(VR, 1).setFontWeight('bold').setBackground('#e4e7eb');
+
+  for (let d = 1; d <= 31; d++) {
+    const col = 1 + d; // B列から
+    // 表示月の d日 を表示（月末を超える日は空表示）
+    const dateFormula = `=IF(${d}<=DAY(EOMONTH($B$2,0)), DATE(YEAR($B$2), MONTH($B$2), ${d}), "")`;
+    sheet.getRange(VR, col).setFormula(dateFormula);
+    sheet.getRange(VR, col).setNumberFormat('m/d');
+    sheet.getRange(VR, col).setBackground('#e4e7eb');
+    sheet.getRange(VR, col).setHorizontalAlignment('center');
+  }
+
+  // 残高セクション（6行）
+  const balanceRows = [
+    '月初残高',
+    '実績増減',
+    '予定増減',
+    '実績残高',
+    '予測残高',
+    'スナップショット'
+  ];
+
+  for (let i = 0; i < balanceRows.length; i++) {
+    const row = VR + 1 + i;
+    sheet.getRange(row, 1).setValue(balanceRows[i]);
+    sheet.getRange(row, 1).setFontWeight('bold').setBackground('#f5f7fa');
+  }
+
+  // 行番号定義
+  const monthStartBalanceRow = VR + 1;  // 月初残高
+  const actualNetRow = VR + 2;          // 実績増減
+  const planNetRow = VR + 3;            // 予定増減
+  const actualBalanceRow = VR + 4;      // 実績残高
+  const forecastBalanceRow = VR + 5;    // 予測残高
+  const snapshotRow = VR + 6;           // スナップショット
+
+  // 月初残高（全列同じ値：Helperから参照）
+  for (let d = 1; d <= 31; d++) {
+    const col = 1 + d;
+    const helperColLetter = columnToLetter(HC + 1); // AM列+1 = AN列
+    sheet.getRange(monthStartBalanceRow, col).setFormula(`=${helperColLetter}7`);
+    sheet.getRange(monthStartBalanceRow, col).setNumberFormat('#,##0');
+  }
+
+  // 実績増減（Helperから参照）
+  for (let d = 1; d <= 31; d++) {
+    const col = 1 + d;
+    const helperCol = HC + d;
+    const helperColLetter = columnToLetter(helperCol);
+    sheet.getRange(actualNetRow, col).setFormula(`=${helperColLetter}3`);
+    sheet.getRange(actualNetRow, col).setNumberFormat('#,##0');
+  }
+
+  // 予定増減（Helperから参照）
+  for (let d = 1; d <= 31; d++) {
+    const col = 1 + d;
+    const helperCol = HC + d;
+    const helperColLetter = columnToLetter(helperCol);
+    sheet.getRange(planNetRow, col).setFormula(`=${helperColLetter}4`);
+    sheet.getRange(planNetRow, col).setNumberFormat('#,##0');
+  }
+
+  // 実績残高（累積計算）
+  for (let d = 1; d <= 31; d++) {
+    const col = 1 + d;
+    const colLetter = columnToLetter(col);
+    if (d === 1) {
+      // 1日: 月初残高 + 実績増減
+      sheet.getRange(actualBalanceRow, col).setFormula(`=${colLetter}${monthStartBalanceRow}+${colLetter}${actualNetRow}`);
+    } else {
+      // 2日以降: 前日残高 + 実績増減
+      const prevColLetter = columnToLetter(col - 1);
+      sheet.getRange(actualBalanceRow, col).setFormula(`=${prevColLetter}${actualBalanceRow}+${colLetter}${actualNetRow}`);
+    }
+    sheet.getRange(actualBalanceRow, col).setNumberFormat('#,##0');
+  }
+
+  // 予測残高（実績 or 予測の切替）
+  for (let d = 1; d <= 31; d++) {
+    const col = 1 + d;
+    const colLetter = columnToLetter(col);
+    const helperCol = HC + d;
+    const helperColLetter = columnToLetter(helperCol);
+
+    if (d === 1) {
+      // 1日: HasActualならActualBalance、そうでなければ月初+Plan
+      sheet.getRange(forecastBalanceRow, col).setFormula(
+        `=IF(${helperColLetter}5, ${colLetter}${actualBalanceRow}, ${colLetter}${monthStartBalanceRow}+${colLetter}${planNetRow})`
+      );
+    } else {
+      // 2日以降: HasActualならActualBalance、そうでなければ前日予測+Plan
+      const prevColLetter = columnToLetter(col - 1);
+      sheet.getRange(forecastBalanceRow, col).setFormula(
+        `=IF(${helperColLetter}5, ${colLetter}${actualBalanceRow}, ${prevColLetter}${forecastBalanceRow}+${colLetter}${planNetRow})`
+      );
+    }
+    sheet.getRange(forecastBalanceRow, col).setNumberFormat('#,##0');
+  }
+
+  // スナップショット（該当日のみ表示）
+  // TODO: 後で実装
+
+  // 列幅調整（日付列）
+  for (let d = 2; d <= 32; d++) {
+    sheet.setColumnWidth(d, 70);
+  }
+
+  Logger.log('CF シート作成完了（Controls + Snapshots + Helper + View）');
+}
+
+/**
+ * 列番号をアルファベットに変換（A=1, B=2, ...）
+ */
+function columnToLetter(column) {
+  let temp, letter = '';
+  while (column > 0) {
+    temp = (column - 1) % 26;
+    letter = String.fromCharCode(temp + 65) + letter;
+    column = (column - temp - 1) / 26;
+  }
+  return letter;
 }
