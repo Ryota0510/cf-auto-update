@@ -1143,9 +1143,10 @@ function setupCF() {
   sheet.getRange('B3').setBackground('#fff3e0');
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // 2. Helper領域（AM列以降、非表示で集計）
+  // 2. Helper領域（AG列以降、非表示で集計）
+  // View領域はA〜AF列（32列）を使用、Helper はAG列（33列目）から
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  const HC = 39; // AM列 = Helper開始列
+  const HC = 33; // AG列 = Helper開始列
 
   sheet.getRange(1, HC).setValue('Helper領域（集計用・非表示）');
   sheet.getRange(1, HC).setFontSize(12).setFontWeight('bold').setFontColor('#999999');
@@ -1191,8 +1192,9 @@ function setupCF() {
   sheet.getRange(7, HC).setValue('MonthStartBalance');
   sheet.getRange(7, HC + 1).setValue('=IF(CF_Snapshots!A4<>"", SUM(CF_Snapshots!B4:G4), 0)');
 
-  // Helper列を非表示（AM列以降）
-  sheet.hideColumns(HC, 40); // AM〜BZ列を非表示
+  // Helper列を非表示（AG列以降、必要最小限の列数）
+  // 日付配列31列 + その他5行分 = 約35列を非表示
+  sheet.hideColumns(HC, 35); // AG〜BO列を非表示
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // 3. View領域（A5から：目視CF表）
