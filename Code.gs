@@ -1097,6 +1097,14 @@ function setupCF_Snapshots() {
   sheet.getRange('B:B').setNumberFormat('#,##0');
   sheet.getRange('C4:H4').setNumberFormat('#,##0');
 
+  // K列：科目一覧（DB_Budget, DB_Master, Input_CashPlanから統合）
+  sheet.getRange('K3').setValue('科目一覧');
+  sheet.getRange('K3').setFontWeight('bold').setBackground('#34a853').setFontColor('#FFFFFF').setHorizontalAlignment('center');
+
+  // K4: 全シートから科目を取得してソート・ユニーク化
+  const categoryFormula = '=SORT(UNIQUE(FILTER({DB_Budget!A2:A; DB_Master!B2:B; Input_CashPlan!C2:C}, {DB_Budget!A2:A; DB_Master!B2:B; Input_CashPlan!C2:C}<>"" )))';
+  sheet.getRange('K4').setFormula(categoryFormula);
+
   // 列幅調整
   sheet.setColumnWidth(1, 100);  // A列：入力日
   sheet.setColumnWidth(2, 120);  // B列：合計
@@ -1104,6 +1112,7 @@ function setupCF_Snapshots() {
     sheet.setColumnWidth(i, 100); // C〜H列：Source_1〜6残高
   }
   sheet.setColumnWidth(9, 150);  // I列：メモ
+  sheet.setColumnWidth(11, 120); // K列：科目一覧
 
   Logger.log('CF_Snapshots シート作成完了');
 }
