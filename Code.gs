@@ -196,8 +196,8 @@ function setupDB_Transactions() {
   // D2: 金額(+/-) - M列（金額）を数値化（入金+/出金-）
   sheet.getRange('D2').setFormula('=ARRAYFORMULA(IF(M2:M="", "", VALUE(REGEXREPLACE(TO_TEXT(M2:M), "[^0-9-]", ""))))');
 
-  // E2: カスタム関数で自動分類（科目のみ）
-  sheet.getRange('E2').setFormula('=AUTO_CATEGORIZE(C2:C)');
+  // E2: 科目 - 正数（入金）は「入金」、それ以外は自動分類
+  sheet.getRange('E2').setFormula('=ARRAYFORMULA(IF(C2:C="", "", IF(D2:D>0, "入金", AUTO_CATEGORIZE(C2:C))))');
 
   // F2: UID - 口座+取引Noで一意キー生成
   sheet.getRange('F2').setFormula('=ARRAYFORMULA(IF(B2:B="", "", B2:B & "-" & Q2:Q))');
