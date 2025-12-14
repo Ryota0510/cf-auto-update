@@ -527,7 +527,7 @@ function setupDB_Budget() {
   }
 
   // ヘッダー
-  const headers = ['対象', '月間予算', '実残高（MF転記）', '残日数', '1日使用可能額'];
+  const headers = ['科目', '月間予算', '実残高（MF転記）', '残日数', '1日使用可能額'];
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
 
   const headerRange = sheet.getRange(1, 1, 1, headers.length);
@@ -548,7 +548,7 @@ function setupDB_Budget() {
   sheet.getRange(2, 1, sampleData.length, 5).setValues(sampleData);
 
   // 列幅調整
-  sheet.setColumnWidth(1, 150);  // 対象
+  sheet.setColumnWidth(1, 150);  // 科目
   sheet.setColumnWidth(2, 120);  // 月間予算
   sheet.setColumnWidth(3, 150);  // 実残高
   sheet.setColumnWidth(4, 100);  // 残日数
